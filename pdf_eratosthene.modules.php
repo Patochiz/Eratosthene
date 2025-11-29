@@ -1518,6 +1518,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$title .= $outputlangsbis->transnoentities($titlekey);
 		}
 		$title .= ' '.$outputlangs->convToOutputCharset($object->ref);
+		// Ajouter la version si l'extrafield existe
+		if (!empty($object->array_options['options_version'])) {
+			$title .= ' V'.$object->array_options['options_version'];
+		}
 		if ($object->statut == $object::STATUS_DRAFT) {
 			$pdf->SetTextColor(128, 0, 0);
 			$title .= ' - '.$outputlangs->transnoentities("NotValidated");
