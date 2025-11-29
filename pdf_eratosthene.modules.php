@@ -1751,7 +1751,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
 		}
 
-		// BLOC Dates limites (prepa_cde et delai)
+		// BLOC Dates limites (prepa_cde et delai_liv)
 		// Position après les blocs d'adresses
 		$posy_start_dates = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
 		$posy_start_dates += $top_shift;
@@ -1759,7 +1759,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// Récupérer les extrafields de la commande
 		$prepa_cde = '';
-		$delai = '';
+		$delai_liv = '';
 		if (!empty($object->array_options['options_prepa_cde'])) {
 			$prepa_cde = $object->array_options['options_prepa_cde'];
 			// Si c'est une date, la formater
@@ -1767,27 +1767,37 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$prepa_cde = dol_print_date($prepa_cde, 'day', false, $outputlangs);
 			}
 		}
-		if (!empty($object->array_options['options_delai'])) {
-			$delai = $object->array_options['options_delai'];
+		if (!empty($object->array_options['options_delai_liv'])) {
+			$delai_liv = $object->array_options['options_delai_liv'];
 		}
 
-		// Créer le tableau HTML pour les dates limites
-		$html = '<table width="100%" border="1" cellpadding="4" cellspacing="0">';
+		// Créer le tableau HTML pour les dates limites (sans bordures internes)
+		$html = '<table width="100%" border="0" cellpadding="4" cellspacing="0">';
 		$html .= '<tr>';
 		$html .= '<td width="60%" style="color: #000060;"><b>DATE LIMITE DE MODIFICATION DE COMMANDE *</b></td>';
 		$html .= '<td width="40%" style="color: #000000;">: ' . $prepa_cde . '</td>';
 		$html .= '</tr>';
 		$html .= '<tr>';
 		$html .= '<td width="60%" style="color: #000060;"><b>DÉLAI ESTIMATIF DE LIVRAISON / MISE A DISPOSITION</b></td>';
-		$html .= '<td width="40%" style="color: #000000;">: ' . $delai . '</td>';
+		$html .= '<td width="40%" style="color: #000000;">: ' . $delai_liv . '</td>';
 		$html .= '</tr>';
 		$html .= '</table>';
 
-		// Afficher le tableau
-		$pdf->SetFont('', '', $default_font_size + 1);
+		// Afficher le tableau avec la taille de police par défaut
+		$pdf->SetFont('', '', $default_font_size);
 		$pdf->SetXY($this->marge_gauche, $posy_start_dates);
 		$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+
+		// Capturer la position avant d'écrire pour dessiner le cadre
+		$table_x = $this->marge_gauche;
+		$table_y = $posy_start_dates;
+
 		$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy_start_dates, $html, 0, 1, false, true, 'L', true);
+
+		// Dessiner le cadre externe avec le même style que les autres tableaux
+		$table_height = $pdf->GetY() - $table_y;
+		$pdf->SetDrawColor(128, 128, 128);
+		$pdf->Rect($table_x, $table_y, $tableWidth, $table_height);
 
 		// Ajouter le texte de disclaimer en dessous
 		$posy = $pdf->GetY() + 1;
