@@ -1706,7 +1706,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// Position après les blocs d'adresses
 		$posy_start_dates = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
 		$posy_start_dates += $top_shift;
-		$posy_start_dates += $hautcadre + 2; // Position sous les blocs d'adresses
+		$posy_start_dates += $hautcadre - 1; // Position sous les blocs d'adresses (réduit pour gagner de l'espace)
 
 		// Récupérer les extrafields de la commande
 		$prepa_cde = '';
@@ -1759,7 +1759,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// Mettre à jour $top_shift pour réserver l'espace du bloc dates
 		$posy_end_dates = $pdf->GetY();
-		$dates_block_height = $posy_end_dates - $posy_start_dates + 3; // +3 pour marge
+		$dates_block_height = $posy_end_dates - $posy_start_dates; // Pas de marge supplémentaire pour gagner de l'espace
 		$top_shift += $dates_block_height;
 
 		$pdf->SetTextColor(0, 0, 0);
