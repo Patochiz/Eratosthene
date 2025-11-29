@@ -345,9 +345,65 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->MultiCell(0, 3, ''); // Set interline to 3
 				$pdf->SetTextColor(0, 0, 0);
 
+				// Calculer tab_top_newpage AVANT d'ajouter le bloc des dates (qui n'existe que sur page 1)
+				$tab_top_newpage = (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 + $top_shift : 10);
+
+				// BLOC Dates limites (prepa_cde et delai_liv) - Uniquement sur la première page
+				// Récupérer les extrafields de la commande
+				$prepa_cde = '';
+				$delai_liv = '';
+				if (!empty($object->array_options['options_prepa_cde'])) {
+					$prepa_cde = $object->array_options['options_prepa_cde'];
+					// Si c'est une date, la formater
+					if (is_numeric($prepa_cde) && $prepa_cde > 0) {
+						$prepa_cde = dol_print_date($prepa_cde, 'day', false, $outputlangs);
+					}
+				}
+				if (!empty($object->array_options['options_delai_liv'])) {
+					$delai_liv = $object->array_options['options_delai_liv'];
+				}
+
+				// Créer le tableau HTML pour les dates limites (sans bordures internes)
+				$html = '<table width="100%" border="0" cellpadding="4" cellspacing="0">';
+				$html .= '<tr>';
+				$html .= '<td width="60%" style="color: #000060;"><b>DATE LIMITE DE MODIFICATION DE COMMANDE *</b></td>';
+				$html .= '<td width="40%" style="color: #000000;">: ' . $prepa_cde . '</td>';
+				$html .= '</tr>';
+				$html .= '<tr>';
+				$html .= '<td width="60%" style="color: #000060;"><b>DÉLAI ESTIMATIF DE LIVRAISON / MISE A DISPOSITION</b></td>';
+				$html .= '<td width="40%" style="color: #000000;">: ' . $delai_liv . '</td>';
+				$html .= '</tr>';
+				$html .= '</table>';
+
+				// Position après le header
+				$posy_dates = $pdf->GetY() + 2;
+				$pdf->SetFont('', '', $default_font_size);
+				$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+
+				// Capturer la position avant d'écrire pour dessiner le cadre
+				$table_x = $this->marge_gauche;
+				$table_y = $posy_dates;
+
+				$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy_dates, $html, 0, 1, false, true, 'L', true);
+
+				// Dessiner le cadre externe avec le même style que les autres tableaux
+				$table_height = $pdf->GetY() - $table_y;
+				$pdf->SetDrawColor(128, 128, 128);
+				$pdf->Rect($table_x, $table_y, $tableWidth, $table_height);
+
+				// Ajouter le texte de disclaimer en dessous
+				$posy_after_table = $pdf->GetY() + 1;
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$pdf->SetTextColor(0, 0, 0);
+				$pdf->SetXY($this->marge_gauche, $posy_after_table);
+				$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
+
+				// Calculer l'espace utilisé par le bloc des dates pour ajuster tab_top (uniquement pour page 1)
+				$dates_block_height = $pdf->GetY() - $posy_dates + 3;
+				$top_shift += $dates_block_height;
+
 
 				$tab_top = 90 + $top_shift;
-				$tab_top_newpage = (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 + $top_shift : 10);
 
 				$tab_height = $this->page_hauteur - $tab_top - $heightforfooter - $heightforfreetext;
 
@@ -1700,68 +1756,6 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
-		}
-
-		// BLOC Dates limites (prepa_cde et delai_liv) - Uniquement sur la première page
-		if ($pdf->getPage() == 1) {
-			// Position après les blocs d'adresses
-			$posy_start_dates = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
-			$posy_start_dates += $top_shift;
-			$posy_start_dates += $hautcadre + 2; // Position sous les blocs d'adresses
-
-			// Récupérer les extrafields de la commande
-			$prepa_cde = '';
-			$delai_liv = '';
-			if (!empty($object->array_options['options_prepa_cde'])) {
-				$prepa_cde = $object->array_options['options_prepa_cde'];
-				// Si c'est une date, la formater
-				if (is_numeric($prepa_cde) && $prepa_cde > 0) {
-					$prepa_cde = dol_print_date($prepa_cde, 'day', false, $outputlangs);
-				}
-			}
-			if (!empty($object->array_options['options_delai_liv'])) {
-				$delai_liv = $object->array_options['options_delai_liv'];
-			}
-
-			// Créer le tableau HTML pour les dates limites (sans bordures internes)
-			$html = '<table width="100%" border="0" cellpadding="4" cellspacing="0">';
-			$html .= '<tr>';
-			$html .= '<td width="60%" style="color: #000060;"><b>DATE LIMITE DE MODIFICATION DE COMMANDE *</b></td>';
-			$html .= '<td width="40%" style="color: #000000;">: ' . $prepa_cde . '</td>';
-			$html .= '</tr>';
-			$html .= '<tr>';
-			$html .= '<td width="60%" style="color: #000060;"><b>DÉLAI ESTIMATIF DE LIVRAISON / MISE A DISPOSITION</b></td>';
-			$html .= '<td width="40%" style="color: #000000;">: ' . $delai_liv . '</td>';
-			$html .= '</tr>';
-			$html .= '</table>';
-
-			// Afficher le tableau avec la taille de police par défaut
-			$pdf->SetFont('', '', $default_font_size);
-			$pdf->SetXY($this->marge_gauche, $posy_start_dates);
-			$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-
-			// Capturer la position avant d'écrire pour dessiner le cadre
-			$table_x = $this->marge_gauche;
-			$table_y = $posy_start_dates;
-
-			$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy_start_dates, $html, 0, 1, false, true, 'L', true);
-
-			// Dessiner le cadre externe avec le même style que les autres tableaux
-			$table_height = $pdf->GetY() - $table_y;
-			$pdf->SetDrawColor(128, 128, 128);
-			$pdf->Rect($table_x, $table_y, $tableWidth, $table_height);
-
-			// Ajouter le texte de disclaimer en dessous
-			$posy = $pdf->GetY() + 1;
-			$pdf->SetFont('', '', $default_font_size - 1);
-			$pdf->SetTextColor(0, 0, 0);
-			$pdf->SetXY($this->marge_gauche, $posy);
-			$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
-
-			// Mettre à jour $top_shift pour réserver l'espace du bloc dates
-			// Note : on ne l'ajoute PAS à $top_shift car cela affecterait tab_top_newpage pour toutes les pages
-			// Le bloc se positionne naturellement après les blocs d'adresses
-			$posy_end_dates = $pdf->GetY();
 		}
 
 		$pdf->SetTextColor(0, 0, 0);
