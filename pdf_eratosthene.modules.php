@@ -263,7 +263,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			} else {
 				$objectref = dol_sanitizeFileName($object->ref);
 				$dir = getMultidirOutput($object)."/".$objectref;
-				$file = $dir."/".$objectref.".pdf";
+				$file = $dir."/".$objectref."_AR.pdf";
 			}
 
 			if (!file_exists($dir)) {
