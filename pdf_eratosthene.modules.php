@@ -1753,9 +1753,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// BLOC Dates limites (prepa_cde et delai)
 		// Position après les blocs d'adresses
-		$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
-		$posy += $top_shift;
-		$posy += $hautcadre + 5; // Position sous les blocs d'adresses
+		$posy_start_dates = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+		$posy_start_dates += $top_shift;
+		$posy_start_dates += $hautcadre + 5; // Position sous les blocs d'adresses
 
 		// Récupérer les extrafields de la commande
 		$prepa_cde = '';
@@ -1785,9 +1785,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// Afficher le tableau
 		$pdf->SetFont('', '', $default_font_size + 1);
-		$pdf->SetXY($this->marge_gauche, $posy);
+		$pdf->SetXY($this->marge_gauche, $posy_start_dates);
 		$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-		$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy, $html, 0, 1, false, true, 'L', true);
+		$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy_start_dates, $html, 0, 1, false, true, 'L', true);
 
 		// Ajouter le texte de disclaimer en dessous
 		$posy = $pdf->GetY() + 1;
@@ -1795,6 +1795,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetTextColor(0, 0, 0);
 		$pdf->SetXY($this->marge_gauche, $posy);
 		$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
+
+		// Mettre à jour $top_shift pour réserver l'espace du bloc dates
+		$posy_end_dates = $pdf->GetY();
+		$dates_block_height = $posy_end_dates - $posy_start_dates + 3; // +3 pour marge
+		$top_shift += $dates_block_height;
 
 		$pdf->SetTextColor(0, 0, 0);
 		return $top_shift;
