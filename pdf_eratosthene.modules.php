@@ -292,7 +292,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$default_font_size = pdf_getPDFFontSize($outputlangs); // Must be after pdf_getInstance
 				$pdf->SetAutoPageBreak(1, 0);
 
-				$heightforinfotot = 40; // Height reserved to output the info and total part
+				$heightforinfotot = 10; // Height reserved to output the info and total part
 				$heightforfreetext = (isset($conf->global->MAIN_PDF_FREETEXT_HEIGHT) ? $conf->global->MAIN_PDF_FREETEXT_HEIGHT : 5); // Height reserved to output the free text on last page
 				$heightforfooter = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
 
@@ -345,9 +345,66 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->MultiCell(0, 3, ''); // Set interline to 3
 				$pdf->SetTextColor(0, 0, 0);
 
+				// Calculer tab_top_newpage AVANT d'ajouter le bloc des dates (qui n'existe que sur page 1)
+				$tab_top_newpage = (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 + $top_shift : 10);
+
+				// BLOC Dates limites (prepa_cde et delai_liv) - Uniquement sur la première page
+				// Récupérer les extrafields de la commande
+				$prepa_cde = '';
+				$delai_liv = '';
+				if (!empty($object->array_options['options_prepa_cde'])) {
+					$prepa_cde = $object->array_options['options_prepa_cde'];
+					// Si c'est une date, la formater
+					if (is_numeric($prepa_cde) && $prepa_cde > 0) {
+						$prepa_cde = dol_print_date($prepa_cde, 'day', false, $outputlangs);
+					}
+				}
+				if (!empty($object->array_options['options_delai_liv'])) {
+					$delai_liv = $object->array_options['options_delai_liv'];
+				}
+
+				// Créer le tableau HTML pour les dates limites (sans bordures internes)
+				$html = '<table width="100%" border="0" cellpadding="4" cellspacing="0">';
+				$html .= '<tr>';
+				$html .= '<td width="60%" style="color: #000060;"><b>DATE LIMITE DE MODIFICATION DE COMMANDE *</b></td>';
+				$html .= '<td width="40%" style="color: #000000;">: ' . $prepa_cde . '</td>';
+				$html .= '</tr>';
+				$html .= '<tr>';
+				$html .= '<td width="60%" style="color: #000060;"><b>DÉLAI ESTIMATIF DE LIVRAISON / MISE A DISPOSITION</b></td>';
+				$html .= '<td width="40%" style="color: #000000;">: ' . $delai_liv . '</td>';
+				$html .= '</tr>';
+				$html .= '</table>';
+
+				// Position après le header (augmenté pour descendre le bloc)
+				$posy_dates = $pdf->GetY() + 8;
+				$pdf->SetFont('', '', $default_font_size);
+				$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+
+				// Capturer la position avant d'écrire pour dessiner le cadre
+				$table_x = $this->marge_gauche;
+				$table_y = $posy_dates;
+
+				$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy_dates, $html, 0, 1, false, true, 'L', true);
+
+				// Dessiner le cadre externe avec le même style que les autres tableaux
+				$table_height = $pdf->GetY() - $table_y;
+				$pdf->SetDrawColor(128, 128, 128);
+				$pdf->Rect($table_x, $table_y, $tableWidth, $table_height);
+
+				// Ajouter le texte de disclaimer en dessous
+				$posy_after_table = $pdf->GetY() + 1;
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$pdf->SetTextColor(0, 0, 0);
+				$pdf->SetXY($this->marge_gauche, $posy_after_table);
+				$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
+
+				// Calculer l'espace utilisé par le bloc des dates pour ajuster tab_top (uniquement pour page 1)
+				// Réduction de l'espace pour rapprocher le tableau des extrafields
+				$dates_block_height = $pdf->GetY() - $posy_dates - 10;
+				$top_shift += $dates_block_height;
+
 
 				$tab_top = 90 + $top_shift;
-				$tab_top_newpage = (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 + $top_shift : 10);
 
 				$tab_height = $this->page_hauteur - $tab_top - $heightforfooter - $heightforfreetext;
 
@@ -578,7 +635,42 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					// Description of product line
 					if ($this->getColumnStatus('desc')) {
-						$pdf->startTransaction();
+						// Check if this is the special "Libelle_Cde" service (ID 361) used as title
+						$isTitleService = (isset($object->lines[$i]->fk_product) && $object->lines[$i]->fk_product == 361);
+
+						// Special handling for title service: display description on full width
+						if ($isTitleService) {
+							$pdf->SetFont('', 'B', $default_font_size);
+							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+
+							// Use HTML table to properly handle HTML entities
+							$html = '<table width="100%" border="0" cellpadding="2" cellspacing="0">';
+							$html .= '<tr><td width="100%"><b>' . $object->lines[$i]->desc . '</b></td></tr>';
+							$html .= '</table>';
+
+							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, $html, 0, 1, false, true, 'L', true);
+							$curY = $pdf->GetY();
+						} else {
+							// Normal handling for products and regular services
+							// Modify description to include detail extrafield in 2 columns format
+							// Only for products (product_type = 0), not for services (product_type = 1)
+							$isProduct = (isset($object->lines[$i]->product_type) && $object->lines[$i]->product_type == 0);
+
+							$originalDesc = $object->lines[$i]->desc;
+							$detail = '';
+							if (!empty($object->lines[$i]->array_options['options_detail'])) {
+								$detail = $object->lines[$i]->array_options['options_detail'];
+							}
+
+							// Create a 2-column table with description and detail (only for products)
+							if ($isProduct && (!empty($originalDesc) || !empty($detail))) {
+								$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $originalDesc . '</td>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $detail . '</td>';
+								$object->lines[$i]->desc .= '</tr></table>';
+							}
+
+							$pdf->startTransaction();
 
 						$this->printColDescContent($pdf, $curY, 'desc', $object, $i, $outputlangs, $hideref, $hidedesc);
 						$pageposafter = $pdf->getPage();
@@ -613,6 +705,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$pdf->commitTransaction();
 						}
 						$posYAfterDescription = $pdf->GetY();
+						}
 					}
 
 
@@ -633,6 +726,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					$pdf->SetFont('', '', $default_font_size - 1); // We reposition the default font
 
+					// Check if this is the special "Libelle_Cde" service (ID 361) used as title
+					$isTitleService = (isset($object->lines[$i]->fk_product) && $object->lines[$i]->fk_product == 361);
+
 					// VAT Rate
 					if ($this->getColumnStatus('vat')) {
 						$vat_rate = pdf_getlinevatrate($object, $i, $outputlangs, $hidedetails);
@@ -640,23 +736,28 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Unit price before discount
-					if ($this->getColumnStatus('subprice')) {
+					// Unit price before discount (hidden for title service)
+					if ($this->getColumnStatus('subprice') && !$isTitleService) {
 						$up_excl_tax = pdf_getlineupexcltax($object, $i, $outputlangs, $hidedetails);
 						$this->printStdColumnContent($pdf, $curY, 'subprice', $up_excl_tax);
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Quantity
-					// Enough for 6 chars
-					if ($this->getColumnStatus('qty')) {
+					// Quantity with unit (hidden for title service)
+					if ($this->getColumnStatus('qty') && !$isTitleService) {
 						$qty = pdf_getlineqty($object, $i, $outputlangs, $hidedetails);
-						$this->printStdColumnContent($pdf, $curY, 'qty', $qty);
+						$unit = pdf_getlineunit($object, $i, $outputlangs, $hidedetails, $hookmanager);
+						// Add unit to quantity if it exists
+						$qtyWithUnit = $qty;
+						if (!empty($unit)) {
+							$qtyWithUnit .= ' ' . $unit;
+						}
+						$this->printStdColumnContent($pdf, $curY, 'qty', $qtyWithUnit);
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
 
-					// Unit
+					// Unit (hidden now, unit is shown with qty)
 					if ($this->getColumnStatus('unit')) {
 						$unit = pdf_getlineunit($object, $i, $outputlangs, $hidedetails, $hookmanager);
 						$this->printStdColumnContent($pdf, $curY, 'unit', $unit);
@@ -670,8 +771,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Total excl tax line (HT)
-					if ($this->getColumnStatus('totalexcltax')) {
+					// Total excl tax line (HT) (hidden for title service)
+					if ($this->getColumnStatus('totalexcltax') && !$isTitleService) {
 						$total_excl_tax = pdf_getlinetotalexcltax($object, $i, $outputlangs, $hidedetails);
 						$this->printStdColumnContent($pdf, $curY, 'totalexcltax', $total_excl_tax);
 						$nexY = max($pdf->GetY(), $nexY);
@@ -684,9 +785,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Extrafields
+					// Extrafields (exclude 'options_detail' as it is displayed in custom description)
 					if (!empty($object->lines[$i]->array_options)) {
 						foreach ($object->lines[$i]->array_options as $extrafieldColKey => $extrafieldValue) {
+							// Skip detail as it is displayed in the custom description section
+							if ($extrafieldColKey === 'options_detail') {
+								continue;
+							}
 							if ($this->getColumnStatus($extrafieldColKey)) {
 								$extrafieldValue = $this->getExtrafieldContent($object->lines[$i], $extrafieldColKey, $outputlangs);
 								$this->printStdColumnContent($pdf, $curY, $extrafieldColKey, $extrafieldValue);
@@ -929,6 +1034,27 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->MultiCell(67, 4, $lib_condition_paiement, 0, 'L');
 
 			$posy = $pdf->GetY() + 3;
+
+			// Ligne fluo : demande de retour de l'AR signé
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetFillColor(255, 255, 0); // Jaune fluo
+			$pdf->SetTextColor(0, 0, 0);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$largeur_ligne = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'L', 1);
+
+			$posy = $pdf->GetY() + 2;
+
+			// Bloc de texte avec conditions générales
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
+			$pdf->SetFillColor(255, 255, 255); // Fond blanc
+			$pdf->SetTextColor(0, 0, 0);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$texte_conditions = "Différence de bains possible pour suite de chantiers\n";
+			$texte_conditions .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
+			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'L', 0);
+
+			$posy = $pdf->GetY() + 3;
 		}
 
 		// Check a payment mode is defined
@@ -986,77 +1112,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy = $pdf->GetY() + 1;
 		}
 
-		// Show payment mode
-		if ($object->mode_reglement_code
-			&& $object->mode_reglement_code != 'CHQ'
-			&& $object->mode_reglement_code != 'VIR') {
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($this->marge_gauche, $posy);
-			$titre = $outputlangs->transnoentities("PaymentMode").':';
-			$pdf->MultiCell(80, 5, $titre, 0, 'L');
-
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($posxval, $posy);
-			$lib_mode_reg = $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
-			$pdf->MultiCell(80, 5, $lib_mode_reg, 0, 'L');
-
-			$posy = $pdf->GetY() + 2;
-		}
-
-		// Show payment mode CHQ
-		if (empty($object->mode_reglement_code) || $object->mode_reglement_code == 'CHQ') {
-			// Si mode reglement non force ou si force a CHQ
-			if (getDolGlobalString('FACTURE_CHQ_NUMBER')) {
-				if (getDolGlobalInt('FACTURE_CHQ_NUMBER') > 0) {
-					$account = new Account($this->db);
-					$account->fetch($conf->global->FACTURE_CHQ_NUMBER);
-
-					$pdf->SetXY($this->marge_gauche, $posy);
-					$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-					$pdf->MultiCell(100, 3, $outputlangs->transnoentities('PaymentByChequeOrderedTo', $account->proprio), 0, 'L', 0);
-					$posy = $pdf->GetY() + 1;
-
-					if (!getDolGlobalString('MAIN_PDF_HIDE_CHQ_ADDRESS')) {
-						$pdf->SetXY($this->marge_gauche, $posy);
-						$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-						$pdf->MultiCell(100, 3, $outputlangs->convToOutputCharset($account->owner_address), 0, 'L', 0);
-						$posy = $pdf->GetY() + 2;
-					}
-				}
-				if ($conf->global->FACTURE_CHQ_NUMBER == -1) {
-					$pdf->SetXY($this->marge_gauche, $posy);
-					$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-					$pdf->MultiCell(100, 3, $outputlangs->transnoentities('PaymentByChequeOrderedTo', $this->emetteur->name), 0, 'L', 0);
-					$posy = $pdf->GetY() + 1;
-
-					if (!getDolGlobalString('MAIN_PDF_HIDE_CHQ_ADDRESS')) {
-						$pdf->SetXY($this->marge_gauche, $posy);
-						$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-						$pdf->MultiCell(100, 3, $outputlangs->convToOutputCharset($this->emetteur->getFullAddress()), 0, 'L', 0);
-						$posy = $pdf->GetY() + 2;
-					}
-				}
-			}
-		}
-
-		// If payment mode not forced or forced to VIR, show payment with BAN
-		if (empty($object->mode_reglement_code) || $object->mode_reglement_code == 'VIR') {
-			if ($object->fk_account > 0 || $object->fk_bank > 0 || getDolGlobalInt('FACTURE_RIB_NUMBER')) {
-				$bankid = ($object->fk_account <= 0 ? $conf->global->FACTURE_RIB_NUMBER : $object->fk_account);
-				if ($object->fk_bank > 0) {
-					$bankid = $object->fk_bank; // For backward compatibility when object->fk_account is forced with object->fk_bank
-				}
-				$account = new Account($this->db);
-				$account->fetch($bankid);
-
-				$curx = $this->marge_gauche;
-				$cury = $posy;
-
-				$posy = pdf_bank($pdf, $outputlangs, $curx, $cury, $account, 0, $default_font_size);
-
-				$posy += 2;
-			}
-		}
+		// Payment mode section removed - only payment conditions are displayed
 
 		return $posy;
 	}
@@ -1464,12 +1520,16 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetFont('', 'B', $default_font_size + 3);
 		$pdf->SetXY($posx, $posy);
 		$pdf->SetTextColor(0, 0, 60);
-		$title = $outputlangs->transnoentities($titlekey);
+		$title = "A.R. DE COMMANDE";
 		if (getDolGlobalInt('PDF_USE_ALSO_LANGUAGE_CODE') && is_object($outputlangsbis)) {
 			$title .= ' - ';
 			$title .= $outputlangsbis->transnoentities($titlekey);
 		}
 		$title .= ' '.$outputlangs->convToOutputCharset($object->ref);
+		// Ajouter la version si l'extrafield existe
+		if (!empty($object->array_options['options_version'])) {
+			$title .= ' V'.$object->array_options['options_version'];
+		}
 		if ($object->statut == $object::STATUS_DRAFT) {
 			$pdf->SetTextColor(128, 0, 0);
 			$title .= ' - '.$outputlangs->transnoentities("NotValidated");
@@ -1526,11 +1586,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		$pdf->SetXY($posx, $posy);
 		$pdf->SetTextColor(0, 0, 60);
-		$title = $outputlangs->transnoentities("OrderDate");
-		if (getDolGlobalInt('PDF_USE_ALSO_LANGUAGE_CODE') && is_object($outputlangsbis)) {
-			$title .= ' - '.$outputlangsbis->transnoentities("DateInvoice");
-		}
-		$pdf->MultiCell($w, 3, $title." : ".dol_print_date($object->date, "day", false, $outputlangs, true), '', 'R');
+		$pdf->MultiCell($w, 3, "du ".dol_print_date($object->date, "day", false, $outputlangs, true), '', 'R');
 
 		if (!getDolGlobalString('MAIN_PDF_HIDE_CUSTOMER_CODE') && !empty($object->thirdparty->code_client)) {
 			$posy += 4;
@@ -1563,26 +1619,49 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 
 		if ($showaddress) {
-			// Sender properties
+			// BLOC "Adresse de livraison" (anciennement "Emetteur")
+			// Get shipping contact
 			$carac_emetteur = '';
-			// Add internal contact of object if defined
-			$arrayidcontact = $object->getIdContact('internal', 'SALESREPFOLL');
+			$arrayidcontact = $object->getIdContact('external', 'SHIPPING');
 			if (count($arrayidcontact) > 0) {
-				$object->fetch_user($arrayidcontact[0]);
-				$labelbeforecontactname = ($outputlangs->transnoentities("FromContactName") != 'FromContactName' ? $outputlangs->transnoentities("FromContactName") : $outputlangs->transnoentities("Name"));
-				$carac_emetteur .= ($carac_emetteur ? "\n" : '').$labelbeforecontactname." ".$outputlangs->convToOutputCharset($object->user->getFullName($outputlangs));
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') || getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ' (' : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') && !empty($object->user->office_phone)) ? $object->user->office_phone : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') && getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ', ' : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT') && !empty($object->user->email)) ? $object->user->email : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') || getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ')' : '';
-				$carac_emetteur .= "\n";
+				$object->fetch_contact($arrayidcontact[0]);
+				if ($object->contact) {
+					// Nom du contact
+					$carac_emetteur .= $outputlangs->convToOutputCharset($object->contact->getFullName($outputlangs)) . "\n";
+
+					// Adresse du contact - construction manuelle
+					if (!empty($object->contact->address)) {
+						$carac_emetteur .= $object->contact->address . "\n";
+					}
+
+					// Code postal et ville
+					$carac_emetteur .= $outputlangs->convToOutputCharset($object->contact->zip);
+					if (!empty($object->contact->town)) {
+						$carac_emetteur .= ' ' . $outputlangs->convToOutputCharset($object->contact->town);
+					}
+					$carac_emetteur .= "\n";
+
+					// Pays si différent
+					if (!empty($object->contact->country_code) && $object->contact->country_code != $this->emetteur->country_code) {
+						$carac_emetteur .= $outputlangs->convToOutputCharset($outputlangs->transnoentitiesnoconv("Country".$object->contact->country_code)) . "\n";
+					}
+
+					// Téléphone
+					if (!empty($object->contact->phone_pro)) {
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_pro . "\n";
+					} elseif (!empty($object->contact->phone_mobile)) {
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_mobile . "\n";
+					}
+
+					// Email
+					if (!empty($object->contact->email)) {
+						$carac_emetteur .= $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
+					}
+				}
 			}
 
-			$carac_emetteur .= pdf_build_address($outputlangs, $this->emetteur, $object->thirdparty, '', 0, 'source', $object);
-
-			// Show sender
-			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+			// Show shipping address block
+			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
 			$posy += $top_shift;
 			$posx = $this->marge_gauche;
 			if (getDolGlobalInt('MAIN_INVERT_SENDER_RECIPIENT')) {
@@ -1593,59 +1672,72 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$widthrecbox = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 92 : 82;
 
 
-			// Show sender frame
+			// Show shipping address frame
 			if (!getDolGlobalString('MAIN_PDF_NO_SENDER_FRAME')) {
 				$pdf->SetTextColor(0, 0, 0);
 				$pdf->SetFont('', '', $default_font_size - 2);
 				$pdf->SetXY($posx, $posy - 5);
-				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("BillFrom"), 0, $ltrdirection);
+				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("Adresse de livraison"), 0, $ltrdirection);
 				$pdf->SetXY($posx, $posy);
 				$pdf->SetFillColor(230, 230, 230);
 				$pdf->MultiCell($widthrecbox, $hautcadre, "", 0, 'R', 1);
 				$pdf->SetTextColor(0, 0, 60);
 			}
 
-			// Show sender name
-			if (!getDolGlobalString('MAIN_PDF_HIDE_SENDER_NAME')) {
-				$pdf->SetXY($posx + 2, $posy + 3);
-				$pdf->SetFont('', 'B', $default_font_size);
-				$pdf->MultiCell($widthrecbox - 2, 4, $outputlangs->convToOutputCharset($this->emetteur->name), 0, $ltrdirection);
-				$posy = $pdf->getY();
-			}
-
-			// Show sender information
-			$pdf->SetXY($posx + 2, $posy);
+			// Show shipping address content
+			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->MultiCell($widthrecbox - 2, 4, $carac_emetteur, 0, $ltrdirection);
 
-			// If CUSTOMER contact defined, we use it
-			$usecontact = false;
-			$arrayidcontact = $object->getIdContact('external', 'CUSTOMER');
-			if (count($arrayidcontact) > 0) {
-				$usecontact = true;
-				$result = $object->fetch_contact($arrayidcontact[0]);
-			}
+			// BLOC "Adressé à" - Informations du tiers
+			$thirdparty = $object->thirdparty;
 
-			//Recipient name
-			if ($usecontact && $object->contact->socid != $object->thirdparty->id && getDolGlobalInt('MAIN_USE_COMPANY_NAME_OF_CONTACT')) {
-				$thirdparty = $object->contact;
-			} else {
-				$thirdparty = $object->thirdparty;
-			}
-
+			// Nom du tiers
+			$carac_client = '';
 			if (is_object($thirdparty)) {
-				$carac_client_name = pdfBuildThirdpartyName($thirdparty, $outputlangs);
-			}
+				$carac_client = pdfBuildThirdpartyName($thirdparty, $outputlangs) . "\n";
 
-			$mode =  'target';
-			$carac_client = pdf_build_address($outputlangs, $this->emetteur, $object->thirdparty, ($usecontact ? $object->contact : ''), $usecontact, $mode, $object);
+				// Adresse du tiers
+				$carac_client .= pdf_build_address($outputlangs, $this->emetteur, $thirdparty, '', 0, 'target', $object);
+
+				// Téléphone
+				if (!empty($thirdparty->phone)) {
+					$carac_client .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $thirdparty->phone;
+				}
+
+				// Email
+				if (!empty($thirdparty->email)) {
+					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $thirdparty->email;
+				}
+
+				// Extrafield contacts de la commande - liste d'adresses mail séparées par point-virgule
+				if (!empty($object->array_options['options_contacts'])) {
+					$contacts = $object->array_options['options_contacts'];
+
+					// Si c'est un tableau, le convertir en chaîne avec point-virgule
+					if (is_array($contacts)) {
+						$contacts = implode('; ', $contacts);
+					}
+					// Si c'est une chaîne avec des virgules, remplacer par des points-virgules
+					elseif (is_string($contacts)) {
+						// Remplacer les virgules par des points-virgules si nécessaire
+						$contacts = str_replace(',', '; ', $contacts);
+						// Nettoyer les espaces multiples
+						$contacts = preg_replace('/\s*;\s*/', '; ', $contacts);
+					}
+
+					if (!empty($contacts)) {
+						$carac_client .= "\n" . "Contact : " . $contacts;
+					}
+				}
+			}
 
 			// Show recipient
 			$widthrecbox = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 92 : 100;
 			if ($this->page_largeur < 210) {
 				$widthrecbox = 84; // To work with US executive format
 			}
-			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
 			$posy += $top_shift;
 			$posx = $this->page_largeur - $this->marge_droite - $widthrecbox;
 			if (getDolGlobalInt('MAIN_INVERT_SENDER_RECIPIENT')) {
@@ -1657,20 +1749,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->SetTextColor(0, 0, 0);
 				$pdf->SetFont('', '', $default_font_size - 2);
 				$pdf->SetXY($posx + 2, $posy - 5);
-				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("BillTo"), 0, $ltrdirection);
+				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("Adressé à"), 0, $ltrdirection);
 				$pdf->Rect($posx, $posy, $widthrecbox, $hautcadre);
 			}
 
-			// Show recipient name
-			$pdf->SetXY($posx + 2, $posy + 3);
-			$pdf->SetFont('', 'B', $default_font_size);
-			$pdf->MultiCell($widthrecbox, 2, $carac_client_name, 0, $ltrdirection);
-
-			$posy = $pdf->getY();
-
 			// Show recipient information
+			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
-			$pdf->SetXY($posx + 2, $posy);
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
 		}
 
@@ -1742,7 +1827,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		 );
 		 */
 
-		$rank = 0; // do not use negative rank
+		// Désignation - rank 0
+		$rank = 0;
 		$this->cols['desc'] = array(
 			'rank' => $rank,
 			'width' => false, // only for desc
@@ -1758,6 +1844,53 @@ class pdf_eratosthene extends ModelePDFCommandes
 				'align' => 'L',
 				'padding' => array(1, 0.5, 1, 1.5), // Like css 0 => top , 1 => right, 2 => bottom, 3 => left
 			),
+		);
+
+		// Qté - rank 10
+		$rank = 10;
+		$this->cols['qty'] = array(
+			'rank' => $rank,
+			'width' => 16, // in mm
+			'status' => true,
+			'title' => array(
+				'textkey' => 'Qty'
+			),
+			'border-left' => false, // remove left line separator
+		);
+
+		// PU (Prix Unitaire) - rank 20
+		$rank = 20;
+		$this->cols['subprice'] = array(
+			'rank' => $rank,
+			'width' => 19, // in mm
+			'status' => true,
+			'title' => array(
+				'textkey' => 'PriceUHT'
+			),
+			'border-left' => false, // remove left line separator
+		);
+
+		// Adapt dynamically the width of subprice, if text is too long.
+		$tmpwidth = 0;
+		$nblines = count($object->lines);
+		for ($i = 0; $i < $nblines; $i++) {
+			$tmpwidth2 = dol_strlen(dol_string_nohtmltag(pdf_getlineupexcltax($object, $i, $outputlangs, $hidedetails)));
+			$tmpwidth = max($tmpwidth, $tmpwidth2);
+		}
+		if ($tmpwidth > 10) {
+			$this->cols['subprice']['width'] += (2 * ($tmpwidth - 10));
+		}
+
+		// Total HT - rank 30
+		$rank = 30;
+		$this->cols['totalexcltax'] = array(
+			'rank' => $rank,
+			'width' => 26, // in mm
+			'status' => !getDolGlobalString('PDF_ORDER_HIDE_PRICE_EXCL_TAX') ? true : false,
+			'title' => array(
+				'textkey' => 'TotalHTShort'
+			),
+			'border-left' => false, // remove left line separator
 		);
 
 		// Image of product
@@ -1788,44 +1921,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'VAT'
 			),
-			'border-left' => true, // add left line separator
-		);
-
-		if (!getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_WITHOUT_VAT')) {
-			$this->cols['vat']['status'] = true;
-		}
-
-		$rank = $rank + 10;
-		$this->cols['subprice'] = array(
-			'rank' => $rank,
-			'width' => 19, // in mm
-			'status' => true,
-			'title' => array(
-				'textkey' => 'PriceUHT'
-			),
-			'border-left' => true, // add left line separator
-		);
-
-		// Adapt dynamically the width of subprice, if text is too long.
-		$tmpwidth = 0;
-		$nblines = count($object->lines);
-		for ($i = 0; $i < $nblines; $i++) {
-			$tmpwidth2 = dol_strlen(dol_string_nohtmltag(pdf_getlineupexcltax($object, $i, $outputlangs, $hidedetails)));
-			$tmpwidth = max($tmpwidth, $tmpwidth2);
-		}
-		if ($tmpwidth > 10) {
-			$this->cols['subprice']['width'] += (2 * ($tmpwidth - 10));
-		}
-
-		$rank = $rank + 10;
-		$this->cols['qty'] = array(
-			'rank' => $rank,
-			'width' => 16, // in mm
-			'status' => true,
-			'title' => array(
-				'textkey' => 'Qty'
-			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
 
 		$rank = $rank + 10;
@@ -1836,11 +1932,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'Unit'
 			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
-		if (getDolGlobalInt('PRODUCT_USE_UNITS')) {
-			$this->cols['unit']['status'] = true;
-		}
 
 		$rank = $rank + 10;
 		$this->cols['discount'] = array(
@@ -1850,22 +1943,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'ReductionShort'
 			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
 		if ($this->atleastonediscount) {
 			$this->cols['discount']['status'] = true;
 		}
-
-		$rank = $rank + 1000; // add a big offset to be sure is the last col because default extrafield rank is 100
-		$this->cols['totalexcltax'] = array(
-			'rank' => $rank,
-			'width' => 26, // in mm
-			'status' => !getDolGlobalString('PDF_ORDER_HIDE_PRICE_EXCL_TAX') ? true : false,
-			'title' => array(
-				'textkey' => 'TotalHTShort'
-			),
-			'border-left' => true, // add left line separator
-		);
 
 		$rank = $rank + 1010; // add a big offset to be sure is the last col because default extrafield rank is 100
 		$this->cols['totalincltax'] = array(
@@ -1875,7 +1957,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'TotalTTCShort'
 			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
 
 		// Add extrafields cols
