@@ -1923,9 +1923,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 	 */
 	protected function printColDescContent($pdf, &$curY, $colKey, $object, $i, $outputlangs, $hideref = 0, $hidedesc = 0)
 	{
-		global $hookmanager;
+		global $conf, $hookmanager;
 
-		$coldesc = $this->cols[$colKey];
+		// If column doesn't exist, return
+		if (!isset($this->cols[$colKey])) {
+			return;
+		}
+
 		$txtSize = pdf_getPDFFontSize($outputlangs) - 1;
 
 		$pdf->SetFont('', '', $txtSize);
@@ -1933,10 +1937,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		$posX = $this->getColumnContentXStart($colKey);
 		$posY = $curY;
-		$pdf->SetXY($posX, $posY);
 		$width = $this->getColumnContentWidth($colKey);
 
-		// Get product label
+		$pdf->SetXY($posX, $posY);
+
+		// Get product label/reference
 		$productLabel = '';
 		if (!empty($object->lines[$i]->product_label)) {
 			$productLabel = $object->lines[$i]->product_label;
@@ -1944,38 +1949,52 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$productLabel = $object->lines[$i]->label;
 		}
 
-		// Display product label
+		// Display product label in bold
 		if (!empty($productLabel) && empty($hideref)) {
 			$pdf->SetFont('', 'B', $txtSize);
 			$pdf->MultiCell($width, 3, $outputlangs->convToOutputCharset($productLabel), 0, 'L', 0);
 			$posY = $pdf->GetY();
+			$pdf->SetXY($posX, $posY);
+		}
+
+		// Don't display description if hidedesc is set
+		if (!empty($hidedesc)) {
+			$curY = $pdf->GetY();
+			return;
 		}
 
 		// Get description and detail extrafield
-		$description = !empty($object->lines[$i]->desc) ? $object->lines[$i]->desc : '';
-		$detail = '';
+		$description = '';
+		if (isset($object->lines[$i]->desc)) {
+			$description = $object->lines[$i]->desc;
+		}
 
-		if (!empty($object->lines[$i]->array_options) && isset($object->lines[$i]->array_options['options_detail'])) {
+		$detail = '';
+		if (!empty($object->lines[$i]->array_options['options_detail'])) {
 			$detail = $object->lines[$i]->array_options['options_detail'];
 		}
 
 		// Display description and detail in 2 columns table
-		if (!empty($hidedesc)) {
-			// If hidedesc is set, don't show description
+		$pdf->SetFont('', '', $txtSize);
+
+		if (!empty($description) || !empty($detail)) {
+			// Simple approach: use MultiCell for each column side by side
+			$colWidth = $width / 2;
+
+			// Left column (description)
+			$pdf->SetXY($posX, $posY);
+			$pdf->MultiCell($colWidth - 1, 3, dol_htmlentitiesbr($description, 1), 0, 'L', 0);
+			$leftHeight = $pdf->GetY();
+
+			// Right column (detail)
+			$pdf->SetXY($posX + $colWidth, $posY);
+			$pdf->MultiCell($colWidth - 1, 3, dol_htmlentitiesbr($detail, 1), 0, 'L', 0);
+			$rightHeight = $pdf->GetY();
+
+			// Set curY to the maximum of both columns
+			$curY = max($leftHeight, $rightHeight);
 		} else {
-			$pdf->SetFont('', '', $txtSize);
-			if (!empty($description) || !empty($detail)) {
-				$html = '<table border="0" cellpadding="2" cellspacing="0" width="100%">';
-				$html .= '<tr>';
-				$html .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($description) . '</td>';
-				$html .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($detail) . '</td>';
-				$html .= '</tr>';
-				$html .= '</table>';
-
-				$pdf->writeHTMLCell($width, 0, $posX, $posY, $html, 0, 1, false, true, 'L', true);
-			}
+			$curY = $posY;
 		}
-
-		$curY = $pdf->GetY();
 	}
 }
