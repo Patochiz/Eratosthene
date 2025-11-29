@@ -1045,6 +1045,15 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
 
+		// Show total weight if available
+		if (!empty($object->array_options['options_poids_total'])) {
+			$poids_total = intval($object->array_options['options_poids_total']); // Nombre entier uniquement
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->MultiCell(100, 4, 'POIDS TOTAL = ' . $poids_total . ' Kg', 0, 'L');
+			$posy = $pdf->GetY() + 3;
+		}
+
 		// Show payments conditions
 		if ($object->cond_reglement_code || $object->cond_reglement) {
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
