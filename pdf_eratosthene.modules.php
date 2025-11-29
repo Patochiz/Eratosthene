@@ -1591,14 +1591,14 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					// Téléphone
 					if (!empty($object->contact->phone_pro)) {
-						$carac_emetteur .= $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_pro . "\n";
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_pro . "\n";
 					} elseif (!empty($object->contact->phone_mobile)) {
-						$carac_emetteur .= $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_mobile . "\n";
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_mobile . "\n";
 					}
 
 					// Email
 					if (!empty($object->contact->email)) {
-						$carac_emetteur .= $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
 					}
 				}
 			}
