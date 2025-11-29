@@ -1034,77 +1034,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy = $pdf->GetY() + 1;
 		}
 
-		// Show payment mode
-		if ($object->mode_reglement_code
-			&& $object->mode_reglement_code != 'CHQ'
-			&& $object->mode_reglement_code != 'VIR') {
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($this->marge_gauche, $posy);
-			$titre = $outputlangs->transnoentities("PaymentMode").':';
-			$pdf->MultiCell(80, 5, $titre, 0, 'L');
-
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($posxval, $posy);
-			$lib_mode_reg = $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
-			$pdf->MultiCell(80, 5, $lib_mode_reg, 0, 'L');
-
-			$posy = $pdf->GetY() + 2;
-		}
-
-		// Show payment mode CHQ
-		if (empty($object->mode_reglement_code) || $object->mode_reglement_code == 'CHQ') {
-			// Si mode reglement non force ou si force a CHQ
-			if (getDolGlobalString('FACTURE_CHQ_NUMBER')) {
-				if (getDolGlobalInt('FACTURE_CHQ_NUMBER') > 0) {
-					$account = new Account($this->db);
-					$account->fetch($conf->global->FACTURE_CHQ_NUMBER);
-
-					$pdf->SetXY($this->marge_gauche, $posy);
-					$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-					$pdf->MultiCell(100, 3, $outputlangs->transnoentities('PaymentByChequeOrderedTo', $account->proprio), 0, 'L', 0);
-					$posy = $pdf->GetY() + 1;
-
-					if (!getDolGlobalString('MAIN_PDF_HIDE_CHQ_ADDRESS')) {
-						$pdf->SetXY($this->marge_gauche, $posy);
-						$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-						$pdf->MultiCell(100, 3, $outputlangs->convToOutputCharset($account->owner_address), 0, 'L', 0);
-						$posy = $pdf->GetY() + 2;
-					}
-				}
-				if ($conf->global->FACTURE_CHQ_NUMBER == -1) {
-					$pdf->SetXY($this->marge_gauche, $posy);
-					$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-					$pdf->MultiCell(100, 3, $outputlangs->transnoentities('PaymentByChequeOrderedTo', $this->emetteur->name), 0, 'L', 0);
-					$posy = $pdf->GetY() + 1;
-
-					if (!getDolGlobalString('MAIN_PDF_HIDE_CHQ_ADDRESS')) {
-						$pdf->SetXY($this->marge_gauche, $posy);
-						$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-						$pdf->MultiCell(100, 3, $outputlangs->convToOutputCharset($this->emetteur->getFullAddress()), 0, 'L', 0);
-						$posy = $pdf->GetY() + 2;
-					}
-				}
-			}
-		}
-
-		// If payment mode not forced or forced to VIR, show payment with BAN
-		if (empty($object->mode_reglement_code) || $object->mode_reglement_code == 'VIR') {
-			if ($object->fk_account > 0 || $object->fk_bank > 0 || getDolGlobalInt('FACTURE_RIB_NUMBER')) {
-				$bankid = ($object->fk_account <= 0 ? $conf->global->FACTURE_RIB_NUMBER : $object->fk_account);
-				if ($object->fk_bank > 0) {
-					$bankid = $object->fk_bank; // For backward compatibility when object->fk_account is forced with object->fk_bank
-				}
-				$account = new Account($this->db);
-				$account->fetch($bankid);
-
-				$curx = $this->marge_gauche;
-				$cury = $posy;
-
-				$posy = pdf_bank($pdf, $outputlangs, $curx, $cury, $account, 0, $default_font_size);
-
-				$posy += 2;
-			}
-		}
+		// Payment mode section removed - only payment conditions are displayed
 
 		return $posy;
 	}
