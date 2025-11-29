@@ -1701,6 +1701,27 @@ class pdf_eratosthene extends ModelePDFCommandes
 				if (!empty($thirdparty->email)) {
 					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $thirdparty->email;
 				}
+
+				// Extrafield contacts - liste d'adresses mail séparées par point-virgule
+				if (!empty($thirdparty->array_options['options_contacts'])) {
+					$contacts = $thirdparty->array_options['options_contacts'];
+
+					// Si c'est un tableau, le convertir en chaîne avec point-virgule
+					if (is_array($contacts)) {
+						$contacts = implode('; ', $contacts);
+					}
+					// Si c'est une chaîne avec des virgules, remplacer par des points-virgules
+					elseif (is_string($contacts)) {
+						// Remplacer les virgules par des points-virgules si nécessaire
+						$contacts = str_replace(',', '; ', $contacts);
+						// Nettoyer les espaces multiples
+						$contacts = preg_replace('/\s*;\s*/', '; ', $contacts);
+					}
+
+					if (!empty($contacts)) {
+						$carac_client .= "\n" . "Contact : " . $contacts;
+					}
+				}
 			}
 
 			// Show recipient
