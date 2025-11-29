@@ -1598,7 +1598,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					// Email
 					if (!empty($object->contact->email)) {
-						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
+						$carac_emetteur .= $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
 					}
 				}
 			}
