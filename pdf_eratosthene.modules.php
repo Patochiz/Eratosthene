@@ -375,8 +375,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$html .= '</tr>';
 				$html .= '</table>';
 
-				// Position après le header
-				$posy_dates = $pdf->GetY() + 2;
+				// Position après le header (augmenté pour descendre le bloc)
+				$posy_dates = $pdf->GetY() + 8;
 				$pdf->SetFont('', '', $default_font_size);
 				$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
@@ -399,7 +399,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
 
 				// Calculer l'espace utilisé par le bloc des dates pour ajuster tab_top (uniquement pour page 1)
-				$dates_block_height = $pdf->GetY() - $posy_dates + 3;
+				// Réduction de l'espace pour rapprocher le tableau des extrafields
+				$dates_block_height = $pdf->GetY() - $posy_dates - 10;
 				$top_shift += $dates_block_height;
 
 
