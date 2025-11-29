@@ -1611,25 +1611,34 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 
 		if ($showaddress) {
-			// Sender properties
+			// BLOC "Adresse de livraison" (anciennement "Emetteur")
+			// Get shipping contact
 			$carac_emetteur = '';
-			// Add internal contact of object if defined
-			$arrayidcontact = $object->getIdContact('internal', 'SALESREPFOLL');
+			$arrayidcontact = $object->getIdContact('external', 'SHIPPING');
 			if (count($arrayidcontact) > 0) {
-				$object->fetch_user($arrayidcontact[0]);
-				$labelbeforecontactname = ($outputlangs->transnoentities("FromContactName") != 'FromContactName' ? $outputlangs->transnoentities("FromContactName") : $outputlangs->transnoentities("Name"));
-				$carac_emetteur .= ($carac_emetteur ? "\n" : '').$labelbeforecontactname." ".$outputlangs->convToOutputCharset($object->user->getFullName($outputlangs));
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') || getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ' (' : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') && !empty($object->user->office_phone)) ? $object->user->office_phone : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') && getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ', ' : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT') && !empty($object->user->email)) ? $object->user->email : '';
-				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') || getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ')' : '';
-				$carac_emetteur .= "\n";
+				$object->fetch_contact($arrayidcontact[0]);
+				if ($object->contact) {
+					// Nom du contact
+					$carac_emetteur .= $outputlangs->convToOutputCharset($object->contact->getFullName($outputlangs)) . "\n";
+
+					// Adresse du contact
+					$carac_emetteur .= pdf_build_address($outputlangs, $this->emetteur, $object->contact, '', 1, 'target', $object);
+
+					// Téléphone
+					if (!empty($object->contact->phone_pro)) {
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_pro;
+					} elseif (!empty($object->contact->phone_mobile)) {
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_mobile;
+					}
+
+					// Email
+					if (!empty($object->contact->email)) {
+						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
+					}
+				}
 			}
 
-			$carac_emetteur .= pdf_build_address($outputlangs, $this->emetteur, $object->thirdparty, '', 0, 'source', $object);
-
-			// Show sender
+			// Show shipping address block
 			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
 			$posy += $top_shift;
 			$posx = $this->marge_gauche;
@@ -1641,52 +1650,44 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$widthrecbox = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 92 : 82;
 
 
-			// Show sender frame
+			// Show shipping address frame
 			if (!getDolGlobalString('MAIN_PDF_NO_SENDER_FRAME')) {
 				$pdf->SetTextColor(0, 0, 0);
 				$pdf->SetFont('', '', $default_font_size - 2);
 				$pdf->SetXY($posx, $posy - 5);
-				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("BillFrom"), 0, $ltrdirection);
+				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("Adresse de livraison"), 0, $ltrdirection);
 				$pdf->SetXY($posx, $posy);
 				$pdf->SetFillColor(230, 230, 230);
 				$pdf->MultiCell($widthrecbox, $hautcadre, "", 0, 'R', 1);
 				$pdf->SetTextColor(0, 0, 60);
 			}
 
-			// Show sender name
-			if (!getDolGlobalString('MAIN_PDF_HIDE_SENDER_NAME')) {
-				$pdf->SetXY($posx + 2, $posy + 3);
-				$pdf->SetFont('', 'B', $default_font_size);
-				$pdf->MultiCell($widthrecbox - 2, 4, $outputlangs->convToOutputCharset($this->emetteur->name), 0, $ltrdirection);
-				$posy = $pdf->getY();
-			}
-
-			// Show sender information
-			$pdf->SetXY($posx + 2, $posy);
+			// Show shipping address content
+			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->MultiCell($widthrecbox - 2, 4, $carac_emetteur, 0, $ltrdirection);
 
-			// If CUSTOMER contact defined, we use it
-			$usecontact = false;
-			$arrayidcontact = $object->getIdContact('external', 'CUSTOMER');
-			if (count($arrayidcontact) > 0) {
-				$usecontact = true;
-				$result = $object->fetch_contact($arrayidcontact[0]);
-			}
+			// BLOC "Adressé à" - Informations du tiers
+			$thirdparty = $object->thirdparty;
 
-			//Recipient name
-			if ($usecontact && $object->contact->socid != $object->thirdparty->id && getDolGlobalInt('MAIN_USE_COMPANY_NAME_OF_CONTACT')) {
-				$thirdparty = $object->contact;
-			} else {
-				$thirdparty = $object->thirdparty;
-			}
-
+			// Nom du tiers
+			$carac_client = '';
 			if (is_object($thirdparty)) {
-				$carac_client_name = pdfBuildThirdpartyName($thirdparty, $outputlangs);
-			}
+				$carac_client = pdfBuildThirdpartyName($thirdparty, $outputlangs) . "\n";
 
-			$mode =  'target';
-			$carac_client = pdf_build_address($outputlangs, $this->emetteur, $object->thirdparty, ($usecontact ? $object->contact : ''), $usecontact, $mode, $object);
+				// Adresse du tiers
+				$carac_client .= pdf_build_address($outputlangs, $this->emetteur, $thirdparty, '', 0, 'target', $object);
+
+				// Téléphone
+				if (!empty($thirdparty->phone)) {
+					$carac_client .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $thirdparty->phone;
+				}
+
+				// Email
+				if (!empty($thirdparty->email)) {
+					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $thirdparty->email;
+				}
+			}
 
 			// Show recipient
 			$widthrecbox = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 92 : 100;
@@ -1705,20 +1706,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->SetTextColor(0, 0, 0);
 				$pdf->SetFont('', '', $default_font_size - 2);
 				$pdf->SetXY($posx + 2, $posy - 5);
-				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("BillTo"), 0, $ltrdirection);
+				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("Adressé à"), 0, $ltrdirection);
 				$pdf->Rect($posx, $posy, $widthrecbox, $hautcadre);
 			}
 
-			// Show recipient name
-			$pdf->SetXY($posx + 2, $posy + 3);
-			$pdf->SetFont('', 'B', $default_font_size);
-			$pdf->MultiCell($widthrecbox, 2, $carac_client_name, 0, $ltrdirection);
-
-			$posy = $pdf->getY();
-
 			// Show recipient information
+			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
-			$pdf->SetXY($posx + 2, $posy);
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
 		}
 
