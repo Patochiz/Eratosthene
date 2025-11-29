@@ -292,7 +292,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$default_font_size = pdf_getPDFFontSize($outputlangs); // Must be after pdf_getInstance
 				$pdf->SetAutoPageBreak(1, 0);
 
-				$heightforinfotot = 10; // Height reserved to output the info and total part
+				$heightforinfotot = 20; // Height reserved to output the info and total part
 				$heightforfreetext = (isset($conf->global->MAIN_PDF_FREETEXT_HEIGHT) ? $conf->global->MAIN_PDF_FREETEXT_HEIGHT : 5); // Height reserved to output the free text on last page
 				$heightforfooter = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
 
@@ -1083,13 +1083,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy = $pdf->GetY() + 2;
 
 			// Bloc de texte avec conditions générales
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle + 1);
 			$pdf->SetFillColor(255, 255, 255); // Fond blanc
 			$pdf->SetTextColor(0, 0, 0);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$texte_conditions = "Différence de bains possible pour suite de chantiers\n";
 			$texte_conditions .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
-			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'L', 0);
+			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'J', 0);
 
 			$posy = $pdf->GetY() + 3;
 		}
