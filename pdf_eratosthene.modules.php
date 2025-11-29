@@ -1512,7 +1512,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetFont('', 'B', $default_font_size + 3);
 		$pdf->SetXY($posx, $posy);
 		$pdf->SetTextColor(0, 0, 60);
-		$title = "ACCUSÉ DE RÉCEPTION DE COMMANDE";
+		$title = "A.R. DE COMMANDE";
 		if (getDolGlobalInt('PDF_USE_ALSO_LANGUAGE_CODE') && is_object($outputlangsbis)) {
 			$title .= ' - ';
 			$title .= $outputlangsbis->transnoentities($titlekey);
