@@ -876,6 +876,23 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$pdf->SetLineStyle(array('dash'=>0));
 					}
 
+					// PREVENT LINE SPLIT: Check if we have enough space for the next line
+					// If the current line ends too close to the bottom, force a page break
+					$minSpaceForNextLine = 20; // Minimum space needed for next line in mm (conservative estimate)
+					if ($nexY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + $minSpaceForNextLine))) {
+						// Not enough space, need to add page
+						$pdf->AddPage('', '', true);
+						if (!empty($tplidx)) {
+							$pdf->useTemplate($tplidx);
+						}
+						if (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD')) {
+							$this->_pagehead($pdf, $object, 0, $outputlangs);
+						}
+						$pageposafter = $pdf->getPage();
+						$pagenb++;
+						$nexY = $tab_top_newpage;
+					}
+
 
 					// Detect if some page were added automatically and output _tableau for past pages
 					while ($pagenb < $pageposafter) {
