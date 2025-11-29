@@ -579,14 +579,17 @@ class pdf_eratosthene extends ModelePDFCommandes
 					// Description of product line
 					if ($this->getColumnStatus('desc')) {
 						// Modify description to include detail extrafield in 2 columns format
+						// Only for products (product_type = 0), not for services (product_type = 1)
+						$isProduct = (isset($object->lines[$i]->product_type) && $object->lines[$i]->product_type == 0);
+
 						$originalDesc = $object->lines[$i]->desc;
 						$detail = '';
 						if (!empty($object->lines[$i]->array_options['options_detail'])) {
 							$detail = $object->lines[$i]->array_options['options_detail'];
 						}
 
-						// Create a 2-column table with description and detail
-						if (!empty($originalDesc) || !empty($detail)) {
+						// Create a 2-column table with description and detail (only for products)
+						if ($isProduct && (!empty($originalDesc) || !empty($detail))) {
 							$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
 							$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $originalDesc . '</td>';
 							$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $detail . '</td>';
