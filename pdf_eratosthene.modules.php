@@ -1621,19 +1621,33 @@ class pdf_eratosthene extends ModelePDFCommandes
 					// Nom du contact
 					$carac_emetteur .= $outputlangs->convToOutputCharset($object->contact->getFullName($outputlangs)) . "\n";
 
-					// Adresse du contact
-					$carac_emetteur .= pdf_build_address($outputlangs, $this->emetteur, $object->contact, '', 1, 'target', $object);
+					// Adresse du contact - construction manuelle
+					if (!empty($object->contact->address)) {
+						$carac_emetteur .= $object->contact->address . "\n";
+					}
+
+					// Code postal et ville
+					$carac_emetteur .= $outputlangs->convToOutputCharset($object->contact->zip);
+					if (!empty($object->contact->town)) {
+						$carac_emetteur .= ' ' . $outputlangs->convToOutputCharset($object->contact->town);
+					}
+					$carac_emetteur .= "\n";
+
+					// Pays si différent
+					if (!empty($object->contact->country_code) && $object->contact->country_code != $this->emetteur->country_code) {
+						$carac_emetteur .= $outputlangs->convToOutputCharset($outputlangs->transnoentitiesnoconv("Country".$object->contact->country_code)) . "\n";
+					}
 
 					// Téléphone
 					if (!empty($object->contact->phone_pro)) {
-						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_pro;
+						$carac_emetteur .= $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_pro . "\n";
 					} elseif (!empty($object->contact->phone_mobile)) {
-						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_mobile;
+						$carac_emetteur .= $outputlangs->transnoentities("Phone") . ": " . $object->contact->phone_mobile . "\n";
 					}
 
 					// Email
 					if (!empty($object->contact->email)) {
-						$carac_emetteur .= "\n" . $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
+						$carac_emetteur .= $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
 					}
 				}
 			}
