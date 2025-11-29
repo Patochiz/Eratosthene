@@ -584,10 +584,14 @@ class pdf_eratosthene extends ModelePDFCommandes
 						// Special handling for title service: display description on full width
 						if ($isTitleService) {
 							$pdf->SetFont('', 'B', $default_font_size);
-							$pdf->SetXY($this->marge_gauche, $curY);
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-							$desc = dol_htmlentitiesbr($object->lines[$i]->desc, 1);
-							$pdf->MultiCell($fullWidth, 4, $outputlangs->convToOutputCharset($desc), 0, 'L', 0);
+
+							// Use HTML table to properly handle HTML entities
+							$html = '<table width="100%" border="0" cellpadding="2" cellspacing="0">';
+							$html .= '<tr><td width="100%"><b>' . $object->lines[$i]->desc . '</b></td></tr>';
+							$html .= '</table>';
+
+							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, $html, 0, 1, false, true, 'L', true);
 							$curY = $pdf->GetY();
 						} else {
 							// Normal handling for products and regular services
