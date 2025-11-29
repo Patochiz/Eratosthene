@@ -578,6 +578,21 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					// Description of product line
 					if ($this->getColumnStatus('desc')) {
+						// Modify description to include detail extrafield in 2 columns format
+						$originalDesc = $object->lines[$i]->desc;
+						$detail = '';
+						if (!empty($object->lines[$i]->array_options['options_detail'])) {
+							$detail = $object->lines[$i]->array_options['options_detail'];
+						}
+
+						// Create a 2-column table with description and detail
+						if (!empty($originalDesc) || !empty($detail)) {
+							$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
+							$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $originalDesc . '</td>';
+							$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $detail . '</td>';
+							$object->lines[$i]->desc .= '</tr></table>';
+						}
+
 						$pdf->startTransaction();
 
 						$this->printColDescContent($pdf, $curY, 'desc', $object, $i, $outputlangs, $hideref, $hidedesc);
@@ -1905,96 +1920,6 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$this->cols = array_replace($this->cols, $hookmanager->resArray); // array_replace is used to preserve keys
 		} else {
 			$this->cols = $hookmanager->resArray;
-		}
-	}
-
-	/**
-	 * Display product description column content - OVERRIDDEN to show description + detail in 2 columns
-	 *
-	 * @param  TCPDF         $pdf            PDF object
-	 * @param  float         $curY           Current Y position
-	 * @param  string        $colKey         Column key
-	 * @param  Commande      $object         Order object
-	 * @param  int           $i              Line index
-	 * @param  Translate     $outputlangs    Output language
-	 * @param  int           $hideref        Hide reference
-	 * @param  int           $hidedesc       Hide description
-	 * @return void
-	 */
-	protected function printColDescContent($pdf, &$curY, $colKey, $object, $i, $outputlangs, $hideref = 0, $hidedesc = 0)
-	{
-		global $conf, $hookmanager;
-
-		// If column doesn't exist, return
-		if (!isset($this->cols[$colKey])) {
-			return;
-		}
-
-		$txtSize = pdf_getPDFFontSize($outputlangs) - 1;
-
-		$pdf->SetFont('', '', $txtSize);
-		$pdf->SetTextColor(0, 0, 0);
-
-		$posX = $this->getColumnContentXStart($colKey);
-		$posY = $curY;
-		$width = $this->getColumnContentWidth($colKey);
-
-		$pdf->SetXY($posX, $posY);
-
-		// Get product label/reference
-		$productLabel = '';
-		if (!empty($object->lines[$i]->product_label)) {
-			$productLabel = $object->lines[$i]->product_label;
-		} elseif (!empty($object->lines[$i]->label)) {
-			$productLabel = $object->lines[$i]->label;
-		}
-
-		// Display product label in bold
-		if (!empty($productLabel) && empty($hideref)) {
-			$pdf->SetFont('', 'B', $txtSize);
-			$pdf->MultiCell($width, 3, $outputlangs->convToOutputCharset($productLabel), 0, 'L', 0);
-			$posY = $pdf->GetY();
-			$pdf->SetXY($posX, $posY);
-		}
-
-		// Don't display description if hidedesc is set
-		if (!empty($hidedesc)) {
-			$curY = $pdf->GetY();
-			return;
-		}
-
-		// Get description and detail extrafield
-		$description = '';
-		if (isset($object->lines[$i]->desc)) {
-			$description = $object->lines[$i]->desc;
-		}
-
-		$detail = '';
-		if (!empty($object->lines[$i]->array_options['options_detail'])) {
-			$detail = $object->lines[$i]->array_options['options_detail'];
-		}
-
-		// Display description and detail in 2 columns table
-		$pdf->SetFont('', '', $txtSize);
-
-		if (!empty($description) || !empty($detail)) {
-			// Simple approach: use MultiCell for each column side by side
-			$colWidth = $width / 2;
-
-			// Left column (description)
-			$pdf->SetXY($posX, $posY);
-			$pdf->MultiCell($colWidth - 1, 3, dol_htmlentitiesbr($description, 1), 0, 'L', 0);
-			$leftHeight = $pdf->GetY();
-
-			// Right column (detail)
-			$pdf->SetXY($posX + $colWidth, $posY);
-			$pdf->MultiCell($colWidth - 1, 3, dol_htmlentitiesbr($detail, 1), 0, 'L', 0);
-			$rightHeight = $pdf->GetY();
-
-			// Set curY to the maximum of both columns
-			$curY = max($leftHeight, $rightHeight);
-		} else {
-			$curY = $posY;
 		}
 	}
 }
