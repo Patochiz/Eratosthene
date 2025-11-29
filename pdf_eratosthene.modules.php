@@ -1759,7 +1759,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// Mettre à jour $top_shift pour réserver l'espace du bloc dates
 		$posy_end_dates = $pdf->GetY();
-		$dates_block_height = $posy_end_dates - $posy_start_dates - 15; // Réduction de 15 unités pour rapprocher les extrafields
+		$dates_block_height = $posy_end_dates - $posy_start_dates - 12; // Réduction de 12 unités pour rapprocher les extrafields
 		$top_shift += $dates_block_height;
 
 		$pdf->SetTextColor(0, 0, 0);
