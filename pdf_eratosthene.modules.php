@@ -647,16 +647,21 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Quantity
-					// Enough for 6 chars
+					// Quantity with unit
 					if ($this->getColumnStatus('qty')) {
 						$qty = pdf_getlineqty($object, $i, $outputlangs, $hidedetails);
-						$this->printStdColumnContent($pdf, $curY, 'qty', $qty);
+						$unit = pdf_getlineunit($object, $i, $outputlangs, $hidedetails, $hookmanager);
+						// Add unit to quantity if it exists
+						$qtyWithUnit = $qty;
+						if (!empty($unit)) {
+							$qtyWithUnit .= ' ' . $unit;
+						}
+						$this->printStdColumnContent($pdf, $curY, 'qty', $qtyWithUnit);
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
 
-					// Unit
+					// Unit (hidden now, unit is shown with qty)
 					if ($this->getColumnStatus('unit')) {
 						$unit = pdf_getlineunit($object, $i, $outputlangs, $hidedetails, $hookmanager);
 						$this->printStdColumnContent($pdf, $curY, 'unit', $unit);
@@ -1742,7 +1747,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		 );
 		 */
 
-		$rank = 0; // do not use negative rank
+		// Désignation - rank 0
+		$rank = 0;
 		$this->cols['desc'] = array(
 			'rank' => $rank,
 			'width' => false, // only for desc
@@ -1758,6 +1764,53 @@ class pdf_eratosthene extends ModelePDFCommandes
 				'align' => 'L',
 				'padding' => array(1, 0.5, 1, 1.5), // Like css 0 => top , 1 => right, 2 => bottom, 3 => left
 			),
+		);
+
+		// Qté - rank 10
+		$rank = 10;
+		$this->cols['qty'] = array(
+			'rank' => $rank,
+			'width' => 16, // in mm
+			'status' => true,
+			'title' => array(
+				'textkey' => 'Qty'
+			),
+			'border-left' => false, // remove left line separator
+		);
+
+		// PU (Prix Unitaire) - rank 20
+		$rank = 20;
+		$this->cols['subprice'] = array(
+			'rank' => $rank,
+			'width' => 19, // in mm
+			'status' => true,
+			'title' => array(
+				'textkey' => 'PriceUHT'
+			),
+			'border-left' => false, // remove left line separator
+		);
+
+		// Adapt dynamically the width of subprice, if text is too long.
+		$tmpwidth = 0;
+		$nblines = count($object->lines);
+		for ($i = 0; $i < $nblines; $i++) {
+			$tmpwidth2 = dol_strlen(dol_string_nohtmltag(pdf_getlineupexcltax($object, $i, $outputlangs, $hidedetails)));
+			$tmpwidth = max($tmpwidth, $tmpwidth2);
+		}
+		if ($tmpwidth > 10) {
+			$this->cols['subprice']['width'] += (2 * ($tmpwidth - 10));
+		}
+
+		// Total HT - rank 30
+		$rank = 30;
+		$this->cols['totalexcltax'] = array(
+			'rank' => $rank,
+			'width' => 26, // in mm
+			'status' => !getDolGlobalString('PDF_ORDER_HIDE_PRICE_EXCL_TAX') ? true : false,
+			'title' => array(
+				'textkey' => 'TotalHTShort'
+			),
+			'border-left' => false, // remove left line separator
 		);
 
 		// Image of product
@@ -1788,44 +1841,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'VAT'
 			),
-			'border-left' => true, // add left line separator
-		);
-
-		if (!getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_WITHOUT_VAT')) {
-			$this->cols['vat']['status'] = true;
-		}
-
-		$rank = $rank + 10;
-		$this->cols['subprice'] = array(
-			'rank' => $rank,
-			'width' => 19, // in mm
-			'status' => true,
-			'title' => array(
-				'textkey' => 'PriceUHT'
-			),
-			'border-left' => true, // add left line separator
-		);
-
-		// Adapt dynamically the width of subprice, if text is too long.
-		$tmpwidth = 0;
-		$nblines = count($object->lines);
-		for ($i = 0; $i < $nblines; $i++) {
-			$tmpwidth2 = dol_strlen(dol_string_nohtmltag(pdf_getlineupexcltax($object, $i, $outputlangs, $hidedetails)));
-			$tmpwidth = max($tmpwidth, $tmpwidth2);
-		}
-		if ($tmpwidth > 10) {
-			$this->cols['subprice']['width'] += (2 * ($tmpwidth - 10));
-		}
-
-		$rank = $rank + 10;
-		$this->cols['qty'] = array(
-			'rank' => $rank,
-			'width' => 16, // in mm
-			'status' => true,
-			'title' => array(
-				'textkey' => 'Qty'
-			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
 
 		$rank = $rank + 10;
@@ -1836,11 +1852,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'Unit'
 			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
-		if (getDolGlobalInt('PRODUCT_USE_UNITS')) {
-			$this->cols['unit']['status'] = true;
-		}
 
 		$rank = $rank + 10;
 		$this->cols['discount'] = array(
@@ -1850,22 +1863,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'ReductionShort'
 			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
 		if ($this->atleastonediscount) {
 			$this->cols['discount']['status'] = true;
 		}
-
-		$rank = $rank + 1000; // add a big offset to be sure is the last col because default extrafield rank is 100
-		$this->cols['totalexcltax'] = array(
-			'rank' => $rank,
-			'width' => 26, // in mm
-			'status' => !getDolGlobalString('PDF_ORDER_HIDE_PRICE_EXCL_TAX') ? true : false,
-			'title' => array(
-				'textkey' => 'TotalHTShort'
-			),
-			'border-left' => true, // add left line separator
-		);
 
 		$rank = $rank + 1010; // add a big offset to be sure is the last col because default extrafield rank is 100
 		$this->cols['totalincltax'] = array(
@@ -1875,7 +1877,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			'title' => array(
 				'textkey' => 'TotalTTCShort'
 			),
-			'border-left' => true, // add left line separator
+			'border-left' => false, // remove left line separator
 		);
 
 		// Add extrafields cols
