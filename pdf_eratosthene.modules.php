@@ -1751,6 +1751,51 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
 		}
 
+		// BLOC Dates limites (prepa_cde et delai)
+		// Position après les blocs d'adresses
+		$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+		$posy += $top_shift;
+		$posy += $hautcadre + 5; // Position sous les blocs d'adresses
+
+		// Récupérer les extrafields de la commande
+		$prepa_cde = '';
+		$delai = '';
+		if (!empty($object->array_options['options_prepa_cde'])) {
+			$prepa_cde = $object->array_options['options_prepa_cde'];
+			// Si c'est une date, la formater
+			if (is_numeric($prepa_cde) && $prepa_cde > 0) {
+				$prepa_cde = dol_print_date($prepa_cde, 'day', false, $outputlangs);
+			}
+		}
+		if (!empty($object->array_options['options_delai'])) {
+			$delai = $object->array_options['options_delai'];
+		}
+
+		// Créer le tableau HTML pour les dates limites
+		$html = '<table width="100%" border="1" cellpadding="4" cellspacing="0">';
+		$html .= '<tr>';
+		$html .= '<td width="60%" style="color: #000060;"><b>DATE LIMITE DE MODIFICATION DE COMMANDE *</b></td>';
+		$html .= '<td width="40%" style="color: #000000;">: ' . $prepa_cde . '</td>';
+		$html .= '</tr>';
+		$html .= '<tr>';
+		$html .= '<td width="60%" style="color: #000060;"><b>DÉLAI ESTIMATIF DE LIVRAISON / MISE A DISPOSITION</b></td>';
+		$html .= '<td width="40%" style="color: #000000;">: ' . $delai . '</td>';
+		$html .= '</tr>';
+		$html .= '</table>';
+
+		// Afficher le tableau
+		$pdf->SetFont('', '', $default_font_size + 1);
+		$pdf->SetXY($this->marge_gauche, $posy);
+		$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+		$pdf->writeHTMLCell($tableWidth, 0, $this->marge_gauche, $posy, $html, 0, 1, false, true, 'L', true);
+
+		// Ajouter le texte de disclaimer en dessous
+		$posy = $pdf->GetY() + 1;
+		$pdf->SetFont('', '', $default_font_size - 1);
+		$pdf->SetTextColor(0, 0, 0);
+		$pdf->SetXY($this->marge_gauche, $posy);
+		$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
+
 		$pdf->SetTextColor(0, 0, 0);
 		return $top_shift;
 	}
