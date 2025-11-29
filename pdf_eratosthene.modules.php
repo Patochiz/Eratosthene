@@ -1073,12 +1073,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy = $pdf->GetY() + 3;
 
 			// Ligne fluo : demande de retour de l'AR signé
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
 			$pdf->SetFillColor(255, 255, 0); // Jaune fluo
 			$pdf->SetTextColor(0, 0, 0);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$largeur_ligne = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'L', 1);
+			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'C', 1);
 
 			$posy = $pdf->GetY() + 2;
 
