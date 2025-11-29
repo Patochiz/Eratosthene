@@ -977,6 +977,27 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->MultiCell(67, 4, $lib_condition_paiement, 0, 'L');
 
 			$posy = $pdf->GetY() + 3;
+
+			// Ligne fluo : demande de retour de l'AR signé
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetFillColor(255, 255, 0); // Jaune fluo
+			$pdf->SetTextColor(0, 0, 0);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$largeur_ligne = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'L', 1);
+
+			$posy = $pdf->GetY() + 2;
+
+			// Bloc de texte avec conditions générales
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
+			$pdf->SetFillColor(255, 255, 255); // Fond blanc
+			$pdf->SetTextColor(0, 0, 0);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$texte_conditions = "Différence de bains possible pour suite de chantiers\n";
+			$texte_conditions .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
+			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'L', 0);
+
+			$posy = $pdf->GetY() + 3;
 		}
 
 		// Check a payment mode is defined
