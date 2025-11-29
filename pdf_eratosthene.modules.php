@@ -578,25 +578,37 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					// Description of product line
 					if ($this->getColumnStatus('desc')) {
-						// Modify description to include detail extrafield in 2 columns format
-						// Only for products (product_type = 0), not for services (product_type = 1)
-						$isProduct = (isset($object->lines[$i]->product_type) && $object->lines[$i]->product_type == 0);
+						// Check if this is the special "Libelle_Cde" service (ID 361) used as title
+						$isTitleService = (isset($object->lines[$i]->fk_product) && $object->lines[$i]->fk_product == 361);
 
-						$originalDesc = $object->lines[$i]->desc;
-						$detail = '';
-						if (!empty($object->lines[$i]->array_options['options_detail'])) {
-							$detail = $object->lines[$i]->array_options['options_detail'];
-						}
+						// Special handling for title service: display description on full width
+						if ($isTitleService) {
+							$pdf->SetFont('', 'B', $default_font_size);
+							$pdf->SetXY($this->marge_gauche, $curY);
+							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+							$pdf->MultiCell($fullWidth, 4, $outputlangs->convToOutputCharset($object->lines[$i]->desc), 0, 'L', 0);
+							$curY = $pdf->GetY();
+						} else {
+							// Normal handling for products and regular services
+							// Modify description to include detail extrafield in 2 columns format
+							// Only for products (product_type = 0), not for services (product_type = 1)
+							$isProduct = (isset($object->lines[$i]->product_type) && $object->lines[$i]->product_type == 0);
 
-						// Create a 2-column table with description and detail (only for products)
-						if ($isProduct && (!empty($originalDesc) || !empty($detail))) {
-							$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
-							$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $originalDesc . '</td>';
-							$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $detail . '</td>';
-							$object->lines[$i]->desc .= '</tr></table>';
-						}
+							$originalDesc = $object->lines[$i]->desc;
+							$detail = '';
+							if (!empty($object->lines[$i]->array_options['options_detail'])) {
+								$detail = $object->lines[$i]->array_options['options_detail'];
+							}
 
-						$pdf->startTransaction();
+							// Create a 2-column table with description and detail (only for products)
+							if ($isProduct && (!empty($originalDesc) || !empty($detail))) {
+								$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $originalDesc . '</td>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $detail . '</td>';
+								$object->lines[$i]->desc .= '</tr></table>';
+							}
+
+							$pdf->startTransaction();
 
 						$this->printColDescContent($pdf, $curY, 'desc', $object, $i, $outputlangs, $hideref, $hidedesc);
 						$pageposafter = $pdf->getPage();
@@ -631,6 +643,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$pdf->commitTransaction();
 						}
 						$posYAfterDescription = $pdf->GetY();
+						}
 					}
 
 
@@ -651,6 +664,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					$pdf->SetFont('', '', $default_font_size - 1); // We reposition the default font
 
+					// Check if this is the special "Libelle_Cde" service (ID 361) used as title
+					$isTitleService = (isset($object->lines[$i]->fk_product) && $object->lines[$i]->fk_product == 361);
+
 					// VAT Rate
 					if ($this->getColumnStatus('vat')) {
 						$vat_rate = pdf_getlinevatrate($object, $i, $outputlangs, $hidedetails);
@@ -658,15 +674,15 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Unit price before discount
-					if ($this->getColumnStatus('subprice')) {
+					// Unit price before discount (hidden for title service)
+					if ($this->getColumnStatus('subprice') && !$isTitleService) {
 						$up_excl_tax = pdf_getlineupexcltax($object, $i, $outputlangs, $hidedetails);
 						$this->printStdColumnContent($pdf, $curY, 'subprice', $up_excl_tax);
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Quantity with unit
-					if ($this->getColumnStatus('qty')) {
+					// Quantity with unit (hidden for title service)
+					if ($this->getColumnStatus('qty') && !$isTitleService) {
 						$qty = pdf_getlineqty($object, $i, $outputlangs, $hidedetails);
 						$unit = pdf_getlineunit($object, $i, $outputlangs, $hidedetails, $hookmanager);
 						// Add unit to quantity if it exists
@@ -693,8 +709,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Total excl tax line (HT)
-					if ($this->getColumnStatus('totalexcltax')) {
+					// Total excl tax line (HT) (hidden for title service)
+					if ($this->getColumnStatus('totalexcltax') && !$isTitleService) {
 						$total_excl_tax = pdf_getlinetotalexcltax($object, $i, $outputlangs, $hidedetails);
 						$this->printStdColumnContent($pdf, $curY, 'totalexcltax', $total_excl_tax);
 						$nexY = max($pdf->GetY(), $nexY);
