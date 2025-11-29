@@ -613,6 +613,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$pdf->commitTransaction();
 						}
 						$posYAfterDescription = $pdf->GetY();
+
+						// Display custom description with extrafields (description + detail in 2 columns, then montant_ecotaxe)
+						$posYAfterDescription = $this->printCustomDescriptionWithExtrafields($pdf, $object, $i, $outputlangs, $posYAfterDescription);
 					}
 
 
@@ -689,9 +692,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$nexY = max($pdf->GetY(), $nexY);
 					}
 
-					// Extrafields
+					// Extrafields (exclude 'options_detail' and 'options_montant_ecotaxe' as they are displayed in custom description)
 					if (!empty($object->lines[$i]->array_options)) {
 						foreach ($object->lines[$i]->array_options as $extrafieldColKey => $extrafieldValue) {
+							// Skip detail and montant_ecotaxe as they are displayed in the custom description section
+							if ($extrafieldColKey === 'options_detail' || $extrafieldColKey === 'options_montant_ecotaxe') {
+								continue;
+							}
 							if ($this->getColumnStatus($extrafieldColKey)) {
 								$extrafieldValue = $this->getExtrafieldContent($object->lines[$i], $extrafieldColKey, $outputlangs);
 								$this->printStdColumnContent($pdf, $curY, $extrafieldColKey, $extrafieldValue);
@@ -1902,5 +1909,55 @@ class pdf_eratosthene extends ModelePDFCommandes
 		} else {
 			$this->cols = $hookmanager->resArray;
 		}
+	}
+
+	/**
+	 * Display custom description with extrafields in table format
+	 *
+	 * @param  TCPDF    $pdf            PDF object
+	 * @param  Object   $object         Object
+	 * @param  int      $i              Line index
+	 * @param  Translate $outputlangs   Output language
+	 * @param  int      $posYAfterDescription Y position after description
+	 * @return int                      New Y position
+	 */
+	protected function printCustomDescriptionWithExtrafields(&$pdf, $object, $i, $outputlangs, $posYAfterDescription)
+	{
+		// Get description and extrafield values
+		$description = !empty($object->lines[$i]->desc) ? $object->lines[$i]->desc : '';
+		$detail = '';
+		$montant_ecotaxe = '';
+
+		if (!empty($object->lines[$i]->array_options)) {
+			if (isset($object->lines[$i]->array_options['options_detail'])) {
+				$detail = $object->lines[$i]->array_options['options_detail'];
+			}
+			if (isset($object->lines[$i]->array_options['options_montant_ecotaxe'])) {
+				$montant_ecotaxe = $object->lines[$i]->array_options['options_montant_ecotaxe'];
+			}
+		}
+
+		$pdf->SetY($posYAfterDescription);
+		$startX = $this->getColumnContentXStart('desc');
+		$width = $this->getColumnContentWidth('desc');
+
+		// Create HTML table with 2 columns (50%/50%) for description and detail
+		if (!empty($description) || !empty($detail)) {
+			$html = '<table border="0" cellpadding="2" cellspacing="0" width="100%">';
+			$html .= '<tr>';
+			$html .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($description) . '</td>';
+			$html .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($detail) . '</td>';
+			$html .= '</tr>';
+			$html .= '</table>';
+
+			$pdf->writeHTMLCell($width, 0, $startX, $pdf->GetY(), $html, 0, 1, false, true, 'L', true);
+		}
+
+		// Display montant_ecotaxe on a separate line
+		if (!empty($montant_ecotaxe)) {
+			$pdf->writeHTMLCell($width, 0, $startX, $pdf->GetY(), dol_htmlentitiesbr($montant_ecotaxe), 0, 1, false, true, 'L', true);
+		}
+
+		return $pdf->GetY();
 	}
 }
