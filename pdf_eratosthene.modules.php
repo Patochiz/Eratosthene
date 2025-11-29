@@ -1702,9 +1702,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $thirdparty->email;
 				}
 
-				// Extrafield contacts - liste d'adresses mail séparées par point-virgule
-				if (!empty($thirdparty->array_options['options_contacts'])) {
-					$contacts = $thirdparty->array_options['options_contacts'];
+				// Extrafield contacts de la commande - liste d'adresses mail séparées par point-virgule
+				if (!empty($object->array_options['options_contacts'])) {
+					$contacts = $object->array_options['options_contacts'];
 
 					// Si c'est un tableau, le convertir en chaîne avec point-virgule
 					if (is_array($contacts)) {
