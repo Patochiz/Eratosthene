@@ -586,7 +586,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$pdf->SetFont('', 'B', $default_font_size);
 							$pdf->SetXY($this->marge_gauche, $curY);
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-							$pdf->MultiCell($fullWidth, 4, $outputlangs->convToOutputCharset($object->lines[$i]->desc), 0, 'L', 0);
+							$desc = dol_htmlentitiesbr($object->lines[$i]->desc, 1);
+							$pdf->MultiCell($fullWidth, 4, $outputlangs->convToOutputCharset($desc), 0, 'L', 0);
 							$curY = $pdf->GetY();
 						} else {
 							// Normal handling for products and regular services
