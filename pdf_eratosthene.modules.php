@@ -292,7 +292,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$default_font_size = pdf_getPDFFontSize($outputlangs); // Must be after pdf_getInstance
 				$pdf->SetAutoPageBreak(1, 0);
 
-				$heightforinfotot = 40; // Height reserved to output the info and total part
+				$heightforinfotot = 10; // Height reserved to output the info and total part
 				$heightforfreetext = (isset($conf->global->MAIN_PDF_FREETEXT_HEIGHT) ? $conf->global->MAIN_PDF_FREETEXT_HEIGHT : 5); // Height reserved to output the free text on last page
 				$heightforfooter = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
 
@@ -1604,7 +1604,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			}
 
 			// Show shipping address block
-			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
 			$posy += $top_shift;
 			$posx = $this->marge_gauche;
 			if (getDolGlobalInt('MAIN_INVERT_SENDER_RECIPIENT')) {
@@ -1680,7 +1680,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			if ($this->page_largeur < 210) {
 				$widthrecbox = 84; // To work with US executive format
 			}
-			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+			$posy = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
 			$posy += $top_shift;
 			$posx = $this->page_largeur - $this->marge_droite - $widthrecbox;
 			if (getDolGlobalInt('MAIN_INVERT_SENDER_RECIPIENT')) {
@@ -1704,7 +1704,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// BLOC Dates limites (prepa_cde et delai_liv)
 		// Position après les blocs d'adresses
-		$posy_start_dates = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 40 : 42;
+		$posy_start_dates = getDolGlobalInt('MAIN_PDF_USE_ISO_LOCATION') ? 30 : 32;
 		$posy_start_dates += $top_shift;
 		$posy_start_dates += $hautcadre + 5; // Position sous les blocs d'adresses
 
