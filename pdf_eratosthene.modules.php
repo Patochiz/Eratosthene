@@ -1759,9 +1759,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
 
 			// Mettre à jour $top_shift pour réserver l'espace du bloc dates
+			// Note : on ne l'ajoute PAS à $top_shift car cela affecterait tab_top_newpage pour toutes les pages
+			// Le bloc se positionne naturellement après les blocs d'adresses
 			$posy_end_dates = $pdf->GetY();
-			$dates_block_height = $posy_end_dates - $posy_start_dates - 12; // Réduction de 12 unités pour rapprocher les extrafields
-			$top_shift += $dates_block_height;
 		}
 
 		$pdf->SetTextColor(0, 0, 0);
