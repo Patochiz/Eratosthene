@@ -406,7 +406,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 				$tab_top = 90 + $top_shift;
 
-				$tab_height = $this->page_hauteur - $tab_top - $heightforfooter - $heightforfreetext;
+				$tab_height = $this->page_hauteur - $tab_top - $heightforfooter - $heightforfreetext - $heightforinfotot;
 
 				$nexY = $tab_top - 1;
 
