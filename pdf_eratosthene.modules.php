@@ -376,7 +376,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$html .= '</table>';
 
 				// Position après le header (augmenté pour descendre le bloc)
-				$posy_dates = $pdf->GetY() + 8;
+				// Utilise une position fixe pour garantir un rendu constant
+				// Calculé : position blocs adresses (32) + hauteur cadre (40) + espacement (2+8) = 82mm
+				// On ajoute $top_shift car les blocs d'adresses l'utilisent aussi
+				$posy_dates = 82 + $top_shift;
 				$pdf->SetFont('', '', $default_font_size);
 				$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
