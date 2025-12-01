@@ -399,8 +399,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
 
 				// Calculer l'espace utilisé par le bloc des dates pour ajuster tab_top (uniquement pour page 1)
-				// Réduction de l'espace pour rapprocher le tableau des extrafields
-				$dates_block_height = $pdf->GetY() - $posy_dates - 10;
+				// Hauteur fixe pour avoir un rendu constant sur tous les PDF
+				$dates_block_height = 15; // Hauteur fixe en mm pour les 2 lignes de dates + disclaimer
 				$top_shift += $dates_block_height;
 
 
