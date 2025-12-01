@@ -1794,6 +1794,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
+
+			// Force cursor position to be consistent regardless of content length
+			// This ensures the dates block always starts at the same position
+			$pdf->SetY($posy + $hautcadre + 2);
 		}
 
 		$pdf->SetTextColor(0, 0, 0);
