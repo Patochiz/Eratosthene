@@ -881,7 +881,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 					// PREVENT LINE SPLIT: Check if we have enough space for the next line
 					// If the current line ends too close to the bottom, force a page break
-					$minSpaceForNextLine = 20; // Minimum space needed for next line in mm (conservative estimate)
+					$minSpaceForNextLine = 10; // Minimum space needed for next line in mm
 					if ($nexY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + $minSpaceForNextLine))) {
 						// Not enough space, need to add page
 						// First, draw the table border on the current page before creating new page
