@@ -879,34 +879,6 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$pdf->SetLineStyle(array('dash'=>0));
 					}
 
-					// PREVENT LINE SPLIT: Check if we have enough space for the next line
-					// If the current line ends too close to the bottom, force a page break
-					$minSpaceForNextLine = 10; // Minimum space needed for next line in mm
-					if ($nexY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + $minSpaceForNextLine))) {
-						// Not enough space, need to add page
-						// First, draw the table border on the current page before creating new page
-						$currentPage = $pdf->getPage();
-						$pdf->setPage($currentPage);
-						if ($currentPage == $pageposbeforeprintlines) {
-							$this->_tableau($pdf, $tab_top, $this->page_hauteur - $tab_top - $heightforfooter, 0, $outputlangs, $hidetop, 1, $object->multicurrency_code, $outputlangsbis);
-						} else {
-							$this->_tableau($pdf, $tab_top_newpage, $this->page_hauteur - $tab_top_newpage - $heightforfooter, 0, $outputlangs, 1, 1, $object->multicurrency_code, $outputlangsbis);
-						}
-						$this->_pagefoot($pdf, $object, $outputlangs, 1);
-
-						// Now create the new page
-						$pdf->AddPage('', '', true);
-						if (!empty($tplidx)) {
-							$pdf->useTemplate($tplidx);
-						}
-						if (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD')) {
-							$this->_pagehead($pdf, $object, 0, $outputlangs);
-						}
-						$pageposafter = $pdf->getPage();
-						$pagenb++;
-						$nexY = $tab_top_newpage;
-					}
-
 
 					// Detect if some page were added automatically and output _tableau for past pages
 					while ($pagenb < $pageposafter) {
