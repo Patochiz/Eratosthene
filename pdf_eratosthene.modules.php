@@ -652,6 +652,17 @@ class pdf_eratosthene extends ModelePDFCommandes
 							// Check if there's enough space for the subtotal line (needs ~6mm)
 							if ($curY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + 6))) {
 								// Not enough space, force a page break before subtotal
+								// First, draw the table border on the current page
+								$currentPage = $pdf->getPage();
+								$pdf->setPage($currentPage);
+								if ($currentPage == $pageposbeforeprintlines) {
+									$this->_tableau($pdf, $tab_top, $this->page_hauteur - $tab_top - $heightforfooter, 0, $outputlangs, $hidetop, 1, $object->multicurrency_code, $outputlangsbis);
+								} else {
+									$this->_tableau($pdf, $tab_top_newpage, $this->page_hauteur - $tab_top_newpage - $heightforfooter, 0, $outputlangs, 1, 1, $object->multicurrency_code, $outputlangsbis);
+								}
+								$this->_pagefoot($pdf, $object, $outputlangs, 1);
+
+								// Now create the new page
 								$pdf->AddPage('', '', true);
 								if (!empty($tplidx)) {
 									$pdf->useTemplate($tplidx);
@@ -977,6 +988,17 @@ class pdf_eratosthene extends ModelePDFCommandes
 					// Check if there's enough space for the subtotal line (needs ~6mm)
 					if ($curY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + 6))) {
 						// Not enough space, force a page break before subtotal
+						// First, draw the table border on the current page
+						$currentPage = $pdf->getPage();
+						$pdf->setPage($currentPage);
+						if ($currentPage == $pageposbeforeprintlines) {
+							$this->_tableau($pdf, $tab_top, $this->page_hauteur - $tab_top - $heightforfooter, 0, $outputlangs, $hidetop, 1, $object->multicurrency_code, $outputlangsbis);
+						} else {
+							$this->_tableau($pdf, $tab_top_newpage, $this->page_hauteur - $tab_top_newpage - $heightforfooter, 0, $outputlangs, 1, 1, $object->multicurrency_code, $outputlangsbis);
+						}
+						$this->_pagefoot($pdf, $object, $outputlangs, 1);
+
+						// Now create the new page
 						$pdf->AddPage('', '', true);
 						if (!empty($tplidx)) {
 							$pdf->useTemplate($tplidx);
