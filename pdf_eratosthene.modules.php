@@ -263,7 +263,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			} else {
 				$objectref = dol_sanitizeFileName($object->ref);
 				$dir = getMultidirOutput($object)."/".$objectref;
-				$file = $dir."/".$objectref.".pdf";
+				$file = $dir."/".$objectref."_AR.pdf";
 			}
 
 			if (!file_exists($dir)) {
@@ -292,7 +292,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$default_font_size = pdf_getPDFFontSize($outputlangs); // Must be after pdf_getInstance
 				$pdf->SetAutoPageBreak(1, 0);
 
-				$heightforinfotot = 10; // Height reserved to output the info and total part
+				$heightforinfotot = 22; // Height reserved to output the info and total part
 				$heightforfreetext = (isset($conf->global->MAIN_PDF_FREETEXT_HEIGHT) ? $conf->global->MAIN_PDF_FREETEXT_HEIGHT : 5); // Height reserved to output the free text on last page
 				$heightforfooter = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
 
@@ -376,7 +376,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$html .= '</table>';
 
 				// Position après le header (augmenté pour descendre le bloc)
-				$posy_dates = $pdf->GetY() + 8;
+				// Utilise une position fixe pour garantir un rendu constant
+				// Calculé : position blocs adresses (32) + hauteur cadre (40) + espacement (2+5) = 79mm
+				// On ajoute $top_shift car les blocs d'adresses l'utilisent aussi
+				$posy_dates = 79 + $top_shift;
 				$pdf->SetFont('', '', $default_font_size);
 				$tableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
@@ -399,14 +402,14 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$pdf->MultiCell($tableWidth, 3, '*Des frais peuvent s\'appliquer en cas de modification de la commande après cette date', 0, 'L');
 
 				// Calculer l'espace utilisé par le bloc des dates pour ajuster tab_top (uniquement pour page 1)
-				// Réduction de l'espace pour rapprocher le tableau des extrafields
-				$dates_block_height = $pdf->GetY() - $posy_dates - 10;
+				// Hauteur fixe pour avoir un rendu constant sur tous les PDF
+				$dates_block_height = 15; // Hauteur fixe en mm pour les 2 lignes de dates + disclaimer
 				$top_shift += $dates_block_height;
 
 
 				$tab_top = 90 + $top_shift;
 
-				$tab_height = $this->page_hauteur - $tab_top - $heightforfooter - $heightforfreetext;
+				$tab_height = $this->page_hauteur - $tab_top - $heightforfooter - $heightforfreetext - $heightforinfotot;
 
 				$nexY = $tab_top - 1;
 
@@ -1017,6 +1020,15 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
 
+		// Show total weight if available
+		if (!empty($object->array_options['options_poids_total'])) {
+			$poids_total = intval($object->array_options['options_poids_total']); // Nombre entier uniquement
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->MultiCell(100, 4, 'POIDS TOTAL = ' . $poids_total . ' Kg', 0, 'L');
+			$posy = $pdf->GetY() + 3;
+		}
+
 		// Show payments conditions
 		if ($object->cond_reglement_code || $object->cond_reglement) {
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
@@ -1036,23 +1048,23 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy = $pdf->GetY() + 3;
 
 			// Ligne fluo : demande de retour de l'AR signé
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
 			$pdf->SetFillColor(255, 255, 0); // Jaune fluo
 			$pdf->SetTextColor(0, 0, 0);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$largeur_ligne = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'L', 1);
+			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'C', 1);
 
 			$posy = $pdf->GetY() + 2;
 
 			// Bloc de texte avec conditions générales
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle + 2);
 			$pdf->SetFillColor(255, 255, 255); // Fond blanc
 			$pdf->SetTextColor(0, 0, 0);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$texte_conditions = "Différence de bains possible pour suite de chantiers\n";
 			$texte_conditions .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
-			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'L', 0);
+			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'C', 0);
 
 			$posy = $pdf->GetY() + 3;
 		}
@@ -1757,6 +1769,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
+
+			// Force cursor position to be consistent regardless of content length
+			// This ensures the dates block always starts at the same position
+			$pdf->SetY($posy + $hautcadre + 2);
 		}
 
 		$pdf->SetTextColor(0, 0, 0);
@@ -1850,7 +1866,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$rank = 10;
 		$this->cols['qty'] = array(
 			'rank' => $rank,
-			'width' => 16, // in mm
+			'width' => 20, // in mm (increased to fit "9999.999 m²")
 			'status' => true,
 			'title' => array(
 				'textkey' => 'Qty'
@@ -1862,7 +1878,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$rank = 20;
 		$this->cols['subprice'] = array(
 			'rank' => $rank,
-			'width' => 19, // in mm
+			'width' => 15, // in mm (reduced to compensate qty increase)
 			'status' => true,
 			'title' => array(
 				'textkey' => 'PriceUHT'
