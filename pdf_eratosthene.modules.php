@@ -649,6 +649,20 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 						// Handle subtotal display when encountering a new title (except the first one)
 						if ($isTitleService && $showSubtotals && $firstTitleEncountered && $hasCurrentSection) {
+							// Check if there's enough space for the subtotal line (needs ~6mm)
+							if ($curY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + 6))) {
+								// Not enough space, force a page break before subtotal
+								$pdf->AddPage('', '', true);
+								if (!empty($tplidx)) {
+									$pdf->useTemplate($tplidx);
+								}
+								if (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD')) {
+									$this->_pagehead($pdf, $object, 0, $outputlangs);
+								}
+								$pagenb++;
+								$curY = $tab_top_newpage;
+							}
+
 							// Display subtotal line before the new title
 							$pdf->SetFont('', 'B', $default_font_size - 1);
 							$pdf->SetFillColor(240, 240, 240);
@@ -959,6 +973,21 @@ class pdf_eratosthene extends ModelePDFCommandes
 				// Display final subtotal if enabled and there's a current section
 				if ($showSubtotals && $hasCurrentSection) {
 					$curY = $nexY;
+
+					// Check if there's enough space for the subtotal line (needs ~6mm)
+					if ($curY > ($this->page_hauteur - ($heightforfooter + $heightforfreetext + $heightforinfotot + 6))) {
+						// Not enough space, force a page break before subtotal
+						$pdf->AddPage('', '', true);
+						if (!empty($tplidx)) {
+							$pdf->useTemplate($tplidx);
+						}
+						if (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD')) {
+							$this->_pagehead($pdf, $object, 0, $outputlangs);
+						}
+						$pagenb++;
+						$curY = $tab_top_newpage;
+					}
+
 					$pdf->SetFont('', 'B', $default_font_size - 1);
 					$pdf->SetFillColor(240, 240, 240);
 
