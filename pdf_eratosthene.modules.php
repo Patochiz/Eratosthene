@@ -1866,7 +1866,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$rank = 10;
 		$this->cols['qty'] = array(
 			'rank' => $rank,
-			'width' => 16, // in mm
+			'width' => 20, // in mm (increased to fit "9999.999 m²")
 			'status' => true,
 			'title' => array(
 				'textkey' => 'Qty'
@@ -1878,7 +1878,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$rank = 20;
 		$this->cols['subprice'] = array(
 			'rank' => $rank,
-			'width' => 19, // in mm
+			'width' => 15, // in mm (reduced to compensate qty increase)
 			'status' => true,
 			'title' => array(
 				'textkey' => 'PriceUHT'
