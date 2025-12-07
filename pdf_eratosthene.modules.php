@@ -587,6 +587,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 				$nexY = $tab_top + $this->tabTitleHeight;
 
+				// Initialize subtotal tracking if enabled
+				$showSubtotals = !empty($object->array_options['options_sous_total']);
+				$currentSubtotal = 0;
+				$hasCurrentSection = false;
+				$firstTitleEncountered = false;
+
 				// Loop on each lines
 				$pageposbeforeprintlines = $pdf->getPage();
 				$pagenb = $pageposbeforeprintlines;
@@ -641,8 +647,34 @@ class pdf_eratosthene extends ModelePDFCommandes
 						// Check if this is the special "Libelle_Cde" service (ID 361) used as title
 						$isTitleService = (isset($object->lines[$i]->fk_product) && $object->lines[$i]->fk_product == 361);
 
+						// Handle subtotal display when encountering a new title (except the first one)
+						if ($isTitleService && $showSubtotals && $firstTitleEncountered && $hasCurrentSection) {
+							// Display subtotal line before the new title
+							$pdf->SetFont('', 'B', $default_font_size - 1);
+							$pdf->SetFillColor(240, 240, 240);
+
+							// Subtotal label
+							$subtotalLabel = $outputlangs->trans('Subtotal');
+							$pdf->SetXY($this->marge_gauche, $curY);
+							$pdf->MultiCell($this->page_largeur - $this->marge_gauche - $this->marge_droite - 26, 4, $subtotalLabel, 0, 'R', 1);
+
+							// Subtotal amount (aligned with Total HT column)
+							if ($this->getColumnStatus('totalexcltax')) {
+								$pdf->SetXY($this->getColumnContentXStart('totalexcltax'), $curY);
+								$pdf->MultiCell($this->cols['totalexcltax']['width'], 4, price($currentSubtotal, 0, $outputlangs), 0, 'R', 1);
+							}
+
+							$curY = $pdf->GetY() + 1;
+							$nexY = $curY;
+
+							// Reset for next section
+							$currentSubtotal = 0;
+							$hasCurrentSection = false;
+						}
+
 						// Special handling for title service: display description on full width
 						if ($isTitleService) {
+							$firstTitleEncountered = true;
 							$pdf->SetFont('', 'B', $default_font_size);
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
@@ -779,6 +811,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$total_excl_tax = pdf_getlinetotalexcltax($object, $i, $outputlangs, $hidedetails);
 						$this->printStdColumnContent($pdf, $curY, 'totalexcltax', $total_excl_tax);
 						$nexY = max($pdf->GetY(), $nexY);
+
+						// Accumulate for subtotal if enabled
+						if ($showSubtotals) {
+							$currentSubtotal += $object->lines[$i]->total_ht;
+							$hasCurrentSection = true;
+						}
 					}
 
 					// Total with tax line (TTC)
@@ -916,6 +954,26 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$this->_pagehead($pdf, $object, 0, $outputlangs);
 						}
 					}
+				}
+
+				// Display final subtotal if enabled and there's a current section
+				if ($showSubtotals && $hasCurrentSection) {
+					$curY = $nexY;
+					$pdf->SetFont('', 'B', $default_font_size - 1);
+					$pdf->SetFillColor(240, 240, 240);
+
+					// Subtotal label
+					$subtotalLabel = $outputlangs->trans('Subtotal');
+					$pdf->SetXY($this->marge_gauche, $curY);
+					$pdf->MultiCell($this->page_largeur - $this->marge_gauche - $this->marge_droite - 26, 4, $subtotalLabel, 0, 'R', 1);
+
+					// Subtotal amount (aligned with Total HT column)
+					if ($this->getColumnStatus('totalexcltax')) {
+						$pdf->SetXY($this->getColumnContentXStart('totalexcltax'), $curY);
+						$pdf->MultiCell($this->cols['totalexcltax']['width'], 4, price($currentSubtotal, 0, $outputlangs), 0, 'R', 1);
+					}
+
+					$nexY = $pdf->GetY() + 1;
 				}
 
 				// Show square
