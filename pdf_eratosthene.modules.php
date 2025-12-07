@@ -651,71 +651,21 @@ class pdf_eratosthene extends ModelePDFCommandes
 						if ($isTitleService) {
 							// Handle subtotal display before the new title (except the first one)
 							if ($showSubtotals && $firstTitleEncountered && $hasCurrentSection) {
-								// Test if subtotal + title fit on current page using transaction
-								$pdf->startTransaction();
-
-								// Try to display subtotal
+								// Display subtotal as a simple single line (label + amount concatenated)
 								$pdf->SetFont('', 'B', $default_font_size - 1);
 								$pdf->SetFillColor(240, 240, 240);
+
 								$subtotalLabel = $outputlangs->trans('Subtotal');
 								$subtotalAmount = price($currentSubtotal, 0, $outputlangs);
-								$labelWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite - 26;
-								$pdf->SetXY($this->marge_gauche, $curY);
-								$pdf->Cell($labelWidth, 4, $subtotalLabel, 0, 0, 'R', 1);
-								if ($this->getColumnStatus('totalexcltax')) {
-									$pdf->SetXY($this->getColumnContentXStart('totalexcltax'), $curY);
-									$pdf->Cell($this->cols['totalexcltax']['width'], 4, $subtotalAmount, 0, 1, 'R', 1);
-								}
-								$testYAfterSubtotal = $pdf->GetY() + 1;
 
-								// Try to display title
-								$pdf->SetFont('', 'B', $default_font_size);
+								// Create a single line with label and amount
 								$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-								$html = '<table width="100%" border="0" cellpadding="2" cellspacing="0">';
-								$html .= '<tr><td width="100%"><b>' . $object->lines[$i]->desc . '</b></td></tr>';
-								$html .= '</table>';
-								$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $testYAfterSubtotal, $html, 0, 1, false, true, 'L', true);
+								$subtotalText = $subtotalLabel . '  ' . $subtotalAmount;
 
-								$pageAfterTest = $pdf->getPage();
-
-								// Rollback transaction
-								$pdf->rollbackTransaction(true);
-
-								// If page changed during test, that means they don't fit together
-								if ($pageAfterTest > $pageposbefore) {
-									// First, draw the table border on the current page before creating new page
-									$currentPage = $pdf->getPage();
-									$pdf->setPage($currentPage);
-									if ($currentPage == $pageposbeforeprintlines) {
-										$this->_tableau($pdf, $tab_top, $this->page_hauteur - $tab_top - $heightforfooter, 0, $outputlangs, $hidetop, 1, $object->multicurrency_code, $outputlangsbis);
-									} else {
-										$this->_tableau($pdf, $tab_top_newpage, $this->page_hauteur - $tab_top_newpage - $heightforfooter, 0, $outputlangs, 1, 1, $object->multicurrency_code, $outputlangsbis);
-									}
-									$this->_pagefoot($pdf, $object, $outputlangs, 1);
-
-									// Now create the new page and display subtotal + title on new page
-									$pdf->AddPage('', '', true);
-									if (!empty($tplidx)) {
-										$pdf->useTemplate($tplidx);
-									}
-									if (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD')) {
-										$this->_pagehead($pdf, $object, 0, $outputlangs);
-									}
-									$pagenb++;
-									$pageposbefore = $pdf->getPage();
-									$curY = $tab_top_newpage;
-								}
-
-								// Now display subtotal for real
-								$pdf->SetFont('', 'B', $default_font_size - 1);
-								$pdf->SetFillColor(240, 240, 240);
 								$pdf->SetXY($this->marge_gauche, $curY);
-								$pdf->Cell($labelWidth, 4, $subtotalLabel, 0, 0, 'R', 1);
-								if ($this->getColumnStatus('totalexcltax')) {
-									$pdf->SetXY($this->getColumnContentXStart('totalexcltax'), $curY);
-									$pdf->Cell($this->cols['totalexcltax']['width'], 4, $subtotalAmount, 0, 1, 'R', 1);
-								}
+								$pdf->Cell($fullWidth, 4, $subtotalText, 0, 1, 'R', 1);
 								$curY = $pdf->GetY() + 1;
+								$nexY = $curY;
 
 								// Reset for next section
 								$currentSubtotal = 0;
@@ -1010,21 +960,16 @@ class pdf_eratosthene extends ModelePDFCommandes
 					$pdf->SetFont('', 'B', $default_font_size - 1);
 					$pdf->SetFillColor(240, 240, 240);
 
-					// Use a single line approach to keep label and amount together
-					// Create the subtotal text with label and amount
+					// Display subtotal as a simple single line (label + amount concatenated)
 					$subtotalLabel = $outputlangs->trans('Subtotal');
 					$subtotalAmount = price($currentSubtotal, 0, $outputlangs);
 
-					// Position for label (right aligned before the total column)
-					$labelWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite - 26;
-					$pdf->SetXY($this->marge_gauche, $curY);
-					$pdf->Cell($labelWidth, 4, $subtotalLabel, 0, 0, 'R', 1);
+					// Create a single line with label and amount
+					$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+					$subtotalText = $subtotalLabel . '  ' . $subtotalAmount;
 
-					// Subtotal amount (aligned with Total HT column)
-					if ($this->getColumnStatus('totalexcltax')) {
-						$pdf->SetXY($this->getColumnContentXStart('totalexcltax'), $curY);
-						$pdf->Cell($this->cols['totalexcltax']['width'], 4, $subtotalAmount, 0, 1, 'R', 1);
-					}
+					$pdf->SetXY($this->marge_gauche, $curY);
+					$pdf->Cell($fullWidth, 4, $subtotalText, 0, 1, 'R', 1);
 
 					$nexY = $pdf->GetY() + 1;
 				}
