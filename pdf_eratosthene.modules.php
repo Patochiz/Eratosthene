@@ -700,6 +700,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 								$object->lines[$i]->desc .= '</tr></table>';
 							}
 
+							// Add eco-participation if present
+							if (!empty($object->lines[$i]->array_options['options_montant_ecotaxe'])) {
+								$ecotaxe = price($object->lines[$i]->array_options['options_montant_ecotaxe'], 0, $outputlangs);
+								$object->lines[$i]->desc .= '<br><i>Éco-participation : ' . $ecotaxe . '</i>';
+							}
+
 							$pdf->startTransaction();
 
 						$this->printColDescContent($pdf, $curY, 'desc', $object, $i, $outputlangs, $hideref, $hidedesc);
