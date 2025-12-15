@@ -702,7 +702,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 							// Add eco-participation if present
 							if (!empty($object->lines[$i]->array_options['options_montant_ecotaxe'])) {
-								$ecotaxe = price($object->lines[$i]->array_options['options_montant_ecotaxe'], 0, $outputlangs);
+								$ecotaxe_value = price2num($object->lines[$i]->array_options['options_montant_ecotaxe']);
+								$ecotaxe = price($ecotaxe_value, 0, $outputlangs, 1, -1, -1, $conf->currency);
 								$object->lines[$i]->desc .= '<br><i>Éco-participation : ' . $ecotaxe . '</i>';
 							}
 
