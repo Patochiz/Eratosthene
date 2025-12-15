@@ -677,7 +677,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
 							// Use dol_htmlentitiesbr to properly handle HTML entities and line breaks
-							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, dol_htmlentitiesbr($object->lines[$i]->desc, 1, DOL_HTML_ENTITY_DECODE_ON), 0, 1, false, true, 'L', true);
+							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, dol_htmlentitiesbr($object->lines[$i]->desc), 0, 1, false, true, 'L', true);
 							$curY = $pdf->GetY();
 						} else {
 							// Normal handling for products and regular services
@@ -695,8 +695,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 							// Use dol_htmlentitiesbr to properly handle HTML entities and line breaks
 							if ($isProduct && (!empty($originalDesc) || !empty($detail))) {
 								$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
-								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($originalDesc, 1, DOL_HTML_ENTITY_DECODE_ON) . '</td>';
-								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($detail, 1, DOL_HTML_ENTITY_DECODE_ON) . '</td>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($originalDesc) . '</td>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($detail) . '</td>';
 								$object->lines[$i]->desc .= '</tr></table>';
 							}
 
