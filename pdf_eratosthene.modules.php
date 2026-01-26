@@ -587,6 +587,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 				$nexY = $tab_top + $this->tabTitleHeight;
 
+				// Initialize subtotal tracking if enabled
+				$showSubtotals = !empty($object->array_options['options_sous_total']);
+				$currentSubtotal = 0;
+				$hasCurrentSection = false;
+				$firstTitleEncountered = false;
+
 				// Loop on each lines
 				$pageposbeforeprintlines = $pdf->getPage();
 				$pagenb = $pageposbeforeprintlines;
@@ -643,15 +649,35 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 						// Special handling for title service: display description on full width
 						if ($isTitleService) {
+							// Handle subtotal display before the new title (except the first one)
+							if ($showSubtotals && $firstTitleEncountered && $hasCurrentSection) {
+								// Display subtotal as a simple single line (label + amount concatenated)
+								$pdf->SetFont('', 'B', $default_font_size - 1);
+								$pdf->SetFillColor(240, 240, 240);
+
+								$subtotalLabel = $outputlangs->trans('Subtotal');
+								$subtotalAmount = price($currentSubtotal, 0, $outputlangs);
+
+								// Create a single line with label and amount
+								$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+								$subtotalText = $subtotalLabel . '  ' . $subtotalAmount;
+
+								$pdf->SetXY($this->marge_gauche, $curY);
+								$pdf->Cell($fullWidth, 4, $subtotalText, 0, 1, 'R', 1);
+								$curY = $pdf->GetY() + 1;
+								$nexY = $curY;
+
+								// Reset for next section
+								$currentSubtotal = 0;
+								$hasCurrentSection = false;
+							}
+
+							$firstTitleEncountered = true;
 							$pdf->SetFont('', 'B', $default_font_size);
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
-							// Use HTML table to properly handle HTML entities
-							$html = '<table width="100%" border="0" cellpadding="2" cellspacing="0">';
-							$html .= '<tr><td width="100%"><b>' . $object->lines[$i]->desc . '</b></td></tr>';
-							$html .= '</table>';
-
-							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, $html, 0, 1, false, true, 'L', true);
+							// Use dol_htmlentitiesbr to properly handle HTML entities and line breaks
+							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, dol_htmlentitiesbr($object->lines[$i]->desc), 0, 1, false, true, 'L', true);
 							$curY = $pdf->GetY();
 						} else {
 							// Normal handling for products and regular services
@@ -666,11 +692,19 @@ class pdf_eratosthene extends ModelePDFCommandes
 							}
 
 							// Create a 2-column table with description and detail (only for products)
+							// Use dol_htmlentitiesbr to properly handle HTML entities and line breaks
 							if ($isProduct && (!empty($originalDesc) || !empty($detail))) {
 								$object->lines[$i]->desc = '<table width="100%" border="0" cellpadding="0" cellspacing="0"><tr>';
-								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $originalDesc . '</td>';
-								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . $detail . '</td>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($originalDesc) . '</td>';
+								$object->lines[$i]->desc .= '<td width="50%" valign="top">' . dol_htmlentitiesbr($detail) . '</td>';
 								$object->lines[$i]->desc .= '</tr></table>';
+							}
+
+							// Add eco-participation if present
+							if (!empty($object->lines[$i]->array_options['options_montant_ecotaxe'])) {
+								$ecotaxe_value = price2num($object->lines[$i]->array_options['options_montant_ecotaxe']);
+								$ecotaxe = price($ecotaxe_value, 0, $outputlangs, 1, -1, -1, $conf->currency);
+								$object->lines[$i]->desc .= '<br><i>Éco-participation : ' . $ecotaxe . '</i>';
 							}
 
 							$pdf->startTransaction();
@@ -779,6 +813,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 						$total_excl_tax = pdf_getlinetotalexcltax($object, $i, $outputlangs, $hidedetails);
 						$this->printStdColumnContent($pdf, $curY, 'totalexcltax', $total_excl_tax);
 						$nexY = max($pdf->GetY(), $nexY);
+
+						// Accumulate for subtotal if enabled
+						if ($showSubtotals) {
+							$currentSubtotal += $object->lines[$i]->total_ht;
+							$hasCurrentSection = true;
+						}
 					}
 
 					// Total with tax line (TTC)
@@ -916,6 +956,26 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$this->_pagehead($pdf, $object, 0, $outputlangs);
 						}
 					}
+				}
+
+				// Display final subtotal if enabled and there's a current section
+				if ($showSubtotals && $hasCurrentSection) {
+					$curY = $nexY;
+					$pdf->SetFont('', 'B', $default_font_size - 1);
+					$pdf->SetFillColor(240, 240, 240);
+
+					// Display subtotal as a simple single line (label + amount concatenated)
+					$subtotalLabel = $outputlangs->trans('Subtotal');
+					$subtotalAmount = price($currentSubtotal, 0, $outputlangs);
+
+					// Create a single line with label and amount
+					$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+					$subtotalText = $subtotalLabel . '  ' . $subtotalAmount;
+
+					$pdf->SetXY($this->marge_gauche, $curY);
+					$pdf->Cell($fullWidth, 4, $subtotalText, 0, 1, 'R', 1);
+
+					$nexY = $pdf->GetY() + 1;
 				}
 
 				// Show square
