@@ -1117,14 +1117,33 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 			$posy = $pdf->GetY() + 2;
 
-			// Bloc de texte avec conditions générales
+			// Zone en deux colonnes : signature à gauche, conditions à droite
 			$pdf->SetFont('', '', $default_font_size - $diffsizetitle + 2);
 			$pdf->SetFillColor(255, 255, 255); // Fond blanc
 			$pdf->SetTextColor(0, 0, 0);
-			$pdf->SetXY($this->marge_gauche, $posy);
+
+			// Calcul des largeurs des colonnes (égales)
+			$espace_entre_colonnes = 5;
+			$largeur_colonne = ($largeur_ligne - $espace_entre_colonnes) / 2;
+
+			// Colonne gauche : BON POUR ACCORD dans un cadre
+			$hauteur_cadre_signature = 15;
+			$pdf->Rect($this->marge_gauche, $posy, $largeur_colonne, $hauteur_cadre_signature);
+			$pdf->SetXY($this->marge_gauche + 1, $posy + 1);
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->MultiCell($largeur_colonne - 2, 4, "BON POUR ACCORD (TAMPON + SIGNATURE) :", 0, 'L', 0);
+
+			// Colonne droite : texte des conditions générales
+			$pdf->SetXY($this->marge_gauche + $largeur_colonne + $espace_entre_colonnes, $posy);
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
 			$texte_conditions = "Différence de bains possible pour suite de chantiers\n";
 			$texte_conditions .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
-			$pdf->MultiCell($largeur_ligne, 3, $texte_conditions, 0, 'C', 0);
+			$pdf->MultiCell($largeur_colonne, 3, $texte_conditions, 0, 'L', 0);
+
+			// Positionner Y après la zone la plus haute (signature ou conditions)
+			$posy_apres_signature = $posy + $hauteur_cadre_signature + 1; // Après le cadre signature
+			$posy_apres_conditions = $pdf->GetY();
+			$pdf->SetY(max($posy_apres_signature, $posy_apres_conditions));
 
 			$posy = $pdf->GetY() + 3;
 		}
