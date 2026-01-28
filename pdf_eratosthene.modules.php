@@ -446,8 +446,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 						}
 					}
 				}
-				// Extrafields in note
+				// Extrafields in note (excluding listecolis_fp which is displayed separately)
+				$saved_listecolis = isset($object->array_options['options_listecolis_fp']) ? $object->array_options['options_listecolis_fp'] : null;
+				unset($object->array_options['options_listecolis_fp']);
 				$extranote = $this->getExtrafieldsInHtml($object, $outputlangs);
+				if ($saved_listecolis !== null) {
+					$object->array_options['options_listecolis_fp'] = $saved_listecolis;
+				}
 				if (!empty($extranote)) {
 					$notetoshow = dol_concatdesc($notetoshow, $extranote);
 				}
@@ -985,6 +990,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 					$this->_tableau($pdf, $tab_top_newpage, $this->page_hauteur - $tab_top_newpage - $heightforinfotot - $heightforfreetext - $heightforfooter, 0, $outputlangs, 1, 0, $object->multicurrency_code, $outputlangsbis);
 				}
 				$bottomlasttab = $this->page_hauteur - $heightforinfotot - $heightforfreetext - $heightforfooter + 1;
+
+				// Display colisage list (after products, before totals)
+				$posy_colisage = $nexY + 2;
+				$posy_colisage = $this->drawColisageList($pdf, $object, $posy_colisage, $outputlangs, $tab_top_newpage, $heightforfooter);
 
 				// Display infos area
 				$posy = $this->drawInfoTable($pdf, $object, $bottomlasttab, $outputlangs);
@@ -2077,5 +2086,257 @@ class pdf_eratosthene extends ModelePDFCommandes
 		} else {
 			$this->cols = $hookmanager->resArray;
 		}
+	}
+
+	/**
+	 * Affiche la liste des colis avec gestion des sauts de page
+	 *
+	 * @param TCPDF      $pdf            Objet PDF
+	 * @param Commande   $object         Objet commande
+	 * @param int        $posy           Position Y de départ
+	 * @param Translate  $outputlangs    Objet langue
+	 * @param int        $tab_top        Position top du tableau
+	 * @param int        $heightforfooter Hauteur réservée pour le pied de page
+	 * @return int                       Position Y finale
+	 */
+	protected function drawColisageList(&$pdf, $object, $posy, $outputlangs, $tab_top, $heightforfooter)
+	{
+		global $conf;
+
+		$default_font_size = pdf_getPDFFontSize($outputlangs);
+		$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
+
+		// Récupérer les colis depuis la base de données
+		$sql = "SELECT p.rowid, p.multiplier, p.is_free, p.total_weight, p.total_surface
+				FROM ".MAIN_DB_PREFIX."colisage_packages as p
+				WHERE p.fk_commande = ".((int) $object->id)."
+				ORDER BY p.rowid";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			return $posy;
+		}
+
+		$packages = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$packages[$obj->rowid] = array(
+				'multiplier' => $obj->multiplier,
+				'is_free' => $obj->is_free,
+				'total_weight' => $obj->total_weight,
+				'total_surface' => $obj->total_surface,
+				'items' => array()
+			);
+		}
+		$this->db->free($resql);
+
+		if (empty($packages)) {
+			return $posy;
+		}
+
+		// Récupérer les items de chaque colis
+		$sql = "SELECT i.fk_package, i.fk_commandedet, i.quantity, i.longueur, i.largeur,
+				       i.custom_name, i.custom_longueur, i.custom_largeur,
+				       cd.fk_product, cd.label as line_label, cd.description as line_desc,
+				       p.ref as product_ref, p.label as product_label
+				FROM ".MAIN_DB_PREFIX."colisage_items as i
+				LEFT JOIN ".MAIN_DB_PREFIX."commandedet as cd ON i.fk_commandedet = cd.rowid
+				LEFT JOIN ".MAIN_DB_PREFIX."product as p ON cd.fk_product = p.rowid
+				WHERE i.fk_package IN (".implode(',', array_keys($packages)).")
+				ORDER BY i.fk_package, i.rowid";
+
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				if (isset($packages[$obj->fk_package])) {
+					$packages[$obj->fk_package]['items'][] = array(
+						'fk_commandedet' => $obj->fk_commandedet,
+						'quantity' => $obj->quantity,
+						'longueur' => $obj->longueur,
+						'largeur' => $obj->largeur,
+						'custom_name' => $obj->custom_name,
+						'custom_longueur' => $obj->custom_longueur,
+						'custom_largeur' => $obj->custom_largeur,
+						'product_ref' => $obj->product_ref,
+						'product_label' => $obj->product_label,
+						'line_label' => $obj->line_label
+					);
+				}
+			}
+			$this->db->free($resql);
+		}
+
+		// Organiser par section (titre de chantier) basé sur les lignes de commande
+		$sections = array();
+		$multiRef = array(); // Colis avec plusieurs produits différents
+
+		foreach ($packages as $pkg_id => $pkg) {
+			$items = $pkg['items'];
+			if (empty($items)) continue;
+
+			// Vérifier si le colis contient plusieurs produits différents
+			$productIds = array();
+			foreach ($items as $item) {
+				if (!empty($item['fk_commandedet'])) {
+					$productIds[$item['fk_commandedet']] = true;
+				}
+			}
+
+			if (count($productIds) > 1) {
+				// Colis multi-produits
+				$multiRef[] = array('pkg_id' => $pkg_id, 'pkg' => $pkg);
+			} else {
+				// Colis mono-produit - regrouper par produit
+				$firstItem = $items[0];
+				$productKey = !empty($firstItem['product_ref']) ? $firstItem['product_ref'] : 'libre_'.$firstItem['custom_name'];
+				$productName = !empty($firstItem['product_label']) ? $firstItem['product_label'] : $firstItem['custom_name'];
+
+				if (!isset($sections[$productKey])) {
+					$sections[$productKey] = array(
+						'name' => $productName,
+						'packages' => array()
+					);
+				}
+				$sections[$productKey]['packages'][] = array('pkg_id' => $pkg_id, 'pkg' => $pkg);
+			}
+		}
+
+		// Calculer la hauteur disponible
+		$hauteur_page = $this->page_hauteur - $heightforfooter - 10;
+		$line_height = 4;
+
+		// Titre de la liste des colis
+		if (!empty($sections) || !empty($multiRef)) {
+			$pdf->SetFont('', 'B', $default_font_size);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->Cell(0, 5, 'LISTE DES COLIS', 0, 1, 'L');
+			$posy = $pdf->GetY() + 2;
+		}
+
+		// Afficher les sections mono-produit
+		foreach ($sections as $productKey => $section) {
+			// Vérifier si on a besoin d'une nouvelle page
+			if ($posy > $hauteur_page - 20) {
+				$pdf->AddPage();
+				$posy = $tab_top;
+			}
+
+			// Nom du produit (italique souligné)
+			$pdf->SetFont('', 'I', $default_font_size - 1);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$productName = $section['name'];
+			// Simuler le soulignement
+			$pdf->Cell(0, $line_height, $productName, 0, 1, 'L');
+			$textWidth = $pdf->GetStringWidth($productName);
+			$pdf->Line($this->marge_gauche, $posy + $line_height - 0.5, $this->marge_gauche + $textWidth, $posy + $line_height - 0.5);
+			$posy = $pdf->GetY();
+
+			// Afficher chaque colis
+			foreach ($section['packages'] as $pkgData) {
+				$pkg = $pkgData['pkg'];
+
+				// Vérifier si on a besoin d'une nouvelle page
+				if ($posy > $hauteur_page - 10) {
+					$pdf->AddPage();
+					$posy = $tab_top;
+				}
+
+				$colisText = $this->formatColisLine($pkg);
+				$pdf->SetFont('', '', $default_font_size - 2);
+				$pdf->SetXY($this->marge_gauche + 5, $posy);
+				$pdf->Cell(0, $line_height, $colisText, 0, 1, 'L');
+				$posy = $pdf->GetY();
+			}
+
+			$posy += 2; // Espace entre sections
+		}
+
+		// Afficher les colis multi-produits
+		if (!empty($multiRef)) {
+			// Vérifier si on a besoin d'une nouvelle page
+			if ($posy > $hauteur_page - 20) {
+				$pdf->AddPage();
+				$posy = $tab_top;
+			}
+
+			$pdf->SetFont('', 'B', $default_font_size - 1);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->Cell(0, $line_height, 'Multi Ref', 0, 1, 'L');
+			$posy = $pdf->GetY();
+
+			foreach ($multiRef as $pkgData) {
+				$pkg = $pkgData['pkg'];
+
+				// Vérifier si on a besoin d'une nouvelle page
+				if ($posy > $hauteur_page - 15) {
+					$pdf->AddPage();
+					$posy = $tab_top;
+				}
+
+				// Ligne du colis
+				$colisText = $this->formatColisLine($pkg);
+				$pdf->SetFont('', '', $default_font_size - 2);
+				$pdf->SetXY($this->marge_gauche + 5, $posy);
+				$pdf->Cell(0, $line_height, $colisText, 0, 1, 'L');
+				$posy = $pdf->GetY();
+
+				// Détail des items
+				foreach ($pkg['items'] as $item) {
+					if ($posy > $hauteur_page - 10) {
+						$pdf->AddPage();
+						$posy = $tab_top;
+					}
+
+					$itemName = !empty($item['product_label']) ? $item['product_label'] : $item['custom_name'];
+					$itemText = '  - ' . $itemName;
+					if (!empty($item['quantity']) && $item['quantity'] > 1) {
+						$itemText .= ' x' . $item['quantity'];
+					}
+
+					$pdf->SetFont('', 'I', $default_font_size - 2);
+					$pdf->SetXY($this->marge_gauche + 10, $posy);
+					$pdf->Cell(0, $line_height, $itemText, 0, 1, 'L');
+					$posy = $pdf->GetY();
+				}
+			}
+		}
+
+		return $posy;
+	}
+
+	/**
+	 * Formate une ligne de colis pour l'affichage
+	 *
+	 * @param array $pkg Données du colis
+	 * @return string Texte formaté
+	 */
+	private function formatColisLine($pkg)
+	{
+		$items = $pkg['items'];
+		if (empty($items)) return '';
+
+		$firstItem = $items[0];
+		$multiplier = intval($pkg['multiplier']);
+		$multiplierText = ($multiplier > 1) ? $multiplier . ' x ' : '';
+
+		// Dimensions
+		$longueur = !empty($firstItem['longueur']) ? $firstItem['longueur'] : $firstItem['custom_longueur'];
+		$largeur = !empty($firstItem['largeur']) ? $firstItem['largeur'] : $firstItem['custom_largeur'];
+
+		$dimensions = '';
+		if (!empty($longueur) && !empty($largeur)) {
+			$dimensions = ' (' . $longueur . ' x ' . $largeur . ')';
+		}
+
+		// Quantité dans le colis
+		$qty = !empty($firstItem['quantity']) ? intval($firstItem['quantity']) : 1;
+		$qtyText = ($qty > 1) ? ' x' . $qty : '';
+
+		// Poids
+		$weightText = '';
+		if (!empty($pkg['total_weight'])) {
+			$weightText = ' - ' . number_format($pkg['total_weight'], 2, ',', ' ') . ' kg';
+		}
+
+		return $multiplierText . 'Colis' . $dimensions . $qtyText . $weightText;
 	}
 }
