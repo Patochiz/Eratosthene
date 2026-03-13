@@ -1086,7 +1086,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$pdf->MultiCell(100, 4, 'POIDS TOTAL = ' . $poids_total . ' Kg', 0, 'L');
-			$posy = $pdf->GetY() + 3;
+			$posy = $pdf->GetY() + 1;
 		}
 
 		// Show payments conditions
@@ -1105,7 +1105,22 @@ class pdf_eratosthene extends ModelePDFCommandes
 			}
 			$pdf->MultiCell(67, 4, $lib_condition_paiement, 0, 'L');
 
-			$posy = $pdf->GetY() + 3;
+			$posy = $pdf->GetY() + 1;
+
+			// Show payment mode
+			if ($object->mode_reglement_code || $object->mode_reglement) {
+				$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+				$pdf->SetXY($this->marge_gauche, $posy);
+				$titre_mode = $outputlangs->transnoentities("PaymentMode").':';
+				$pdf->MultiCell(43, 4, $titre_mode, 0, 'L');
+
+				$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
+				$pdf->SetXY($posxval, $posy);
+				$lib_mode_reglement = ($outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code) ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
+				$pdf->MultiCell(67, 4, $lib_mode_reglement, 0, 'L');
+
+				$posy = $pdf->GetY() + 1;
+			}
 
 			// Ligne fluo : demande de retour de l'AR signé
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
