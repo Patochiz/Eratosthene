@@ -1251,11 +1251,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// Total HT
 		$pdf->SetFillColor(224, 224, 224);
 		$pdf->SetTextColor(0, 0, 60);
+		$pdf->SetFont('', 'B', $default_font_size);
 		$pdf->SetXY($col1x, $tab2_top);
 		$pdf->MultiCell($col2x - $col1x, $tab2_hl, $outputlangs->transnoentities("TotalHT").(is_object($outputlangsbis) ? ' / '.$outputlangsbis->transnoentities("TotalHT") : ''), $useborder, 'L', 1);
 		$total_ht = ((isModEnabled("multicurrency") && isset($object->multicurrency_tx) && $object->multicurrency_tx != 1) ? $object->multicurrency_total_ht : $object->total_ht);
 		$pdf->SetXY($col2x, $tab2_top);
 		$pdf->MultiCell($largcol2, $tab2_hl, price($total_ht + (!empty($object->remise) ? $object->remise : 0), 0, $outputlangs), $useborder, 'R', 1);
+		$pdf->SetFont('', '', $default_font_size);
 
 		// Show VAT by rates and total
 		$pdf->SetFillColor(248, 248, 248);
