@@ -1122,8 +1122,6 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$posy = $pdf->GetY() + 1;
 			}
 
-			$posy = $posy + 2;
-
 			// Ligne fluo : demande de retour de l'AR signé
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
 			$pdf->SetFillColor(255, 255, 0); // Jaune fluo
