@@ -1086,7 +1086,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$pdf->MultiCell(100, 4, 'POIDS TOTAL = ' . $poids_total . ' Kg', 0, 'L');
-			$posy = $pdf->GetY() + 3;
+			$posy = $pdf->GetY() + 1;
 		}
 
 		// Show payments conditions
