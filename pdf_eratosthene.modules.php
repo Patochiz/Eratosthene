@@ -1387,42 +1387,47 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 
 
-		// Show payments conditions and payment mode below total block
+		// Show payments conditions and payment mode in right column, below Total HT
 		$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
-		$posxval = 52;
-		$posy_after_totals = $tab2_top + $tab2_hl * $index;
 
 		if ($object->cond_reglement_code || $object->cond_reglement) {
+			$index++;
+			$pdf->SetFillColor(248, 248, 248);
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($this->marge_gauche, $posy_after_totals);
+			$pdf->SetXY($col1x, $tab2_top + $tab2_hl * $index);
 			$titre = $outputlangs->transnoentities("PaymentConditions").':';
-			$pdf->MultiCell(43, 4, $titre, 0, 'L');
+			$pdf->MultiCell($col2x - $col1x, $tab2_hl, $titre, 0, 'L', 1);
 
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($posxval, $posy_after_totals);
 			$lib_condition_paiement = ($outputlangs->transnoentities("PaymentCondition".$object->cond_reglement_code) != 'PaymentCondition'.$object->cond_reglement_code) ? $outputlangs->transnoentities("PaymentCondition".$object->cond_reglement_code) : $outputlangs->convToOutputCharset($object->cond_reglement_doc ? $object->cond_reglement_doc : $object->cond_reglement_label);
 			$lib_condition_paiement = str_replace('\n', "\n", $lib_condition_paiement);
 			if ($object->deposit_percent > 0) {
 				$lib_condition_paiement = str_replace('__DEPOSIT_PERCENT__', $object->deposit_percent, $lib_condition_paiement);
 			}
-			$pdf->MultiCell(67, 4, $lib_condition_paiement, 0, 'L');
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($col2x, $tab2_top + $tab2_hl * $index);
+			$pdf->MultiCell($largcol2, $tab2_hl, $lib_condition_paiement, 0, 'R', 1);
+		}
 
-			$posy_after_totals = $pdf->GetY() + 1;
+		if ($object->mode_reglement_code || $object->mode_reglement) {
+			$index++;
+			$pdf->SetFillColor(248, 248, 248);
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($col1x, $tab2_top + $tab2_hl * $index);
+			$titre_mode = $outputlangs->transnoentities("PaymentMode").':';
+			$pdf->MultiCell($col2x - $col1x, $tab2_hl, $titre_mode, 0, 'L', 1);
 
-			// Show payment mode
-			if ($object->mode_reglement_code || $object->mode_reglement) {
-				$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-				$pdf->SetXY($this->marge_gauche, $posy_after_totals);
-				$titre_mode = $outputlangs->transnoentities("PaymentMode").':';
-				$pdf->MultiCell(43, 4, $titre_mode, 0, 'L');
+			$lib_mode_reglement = ($outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code) ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($col2x, $tab2_top + $tab2_hl * $index);
+			$pdf->MultiCell($largcol2, $tab2_hl, $lib_mode_reglement, 0, 'R', 1);
+		}
 
-				$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-				$pdf->SetXY($posxval, $posy_after_totals);
-				$lib_mode_reglement = ($outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code) ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
-				$pdf->MultiCell(67, 4, $lib_mode_reglement, 0, 'L');
+		$pdf->SetTextColor(0, 0, 0);
 
-				$posy_after_totals = $pdf->GetY() + 1;
-			}
+		// Ligne fluo et signature : positionnées après le bloc des totaux + conditions/mode
+		if ($object->cond_reglement_code || $object->cond_reglement) {
+			$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
+			$posy_after_totals = $tab2_top + $tab2_hl * ($index + 1);
 
 			// Ligne fluo : demande de retour de l'AR signé
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
@@ -1458,7 +1463,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->MultiCell($largeur_colonne, 3, $texte_conditions, 0, 'L', 0);
 
 			// Positionner Y après la zone la plus haute (signature ou conditions)
-			$posy_apres_signature = $posy_after_totals + $hauteur_cadre_signature + 1; // Après le cadre signature
+			$posy_apres_signature = $posy_after_totals + $hauteur_cadre_signature + 1;
 			$posy_apres_conditions = $pdf->GetY();
 			$pdf->SetY(max($posy_apres_signature, $posy_apres_conditions));
 
@@ -1466,7 +1471,10 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 
 		$index++;
-		return ($object->cond_reglement_code || $object->cond_reglement) ? $posy_after_totals : ($tab2_top + ($tab2_hl * $index));
+		if (!empty($posy_after_totals)) {
+			return $posy_after_totals;
+		}
+		return ($tab2_top + ($tab2_hl * $index));
 	}
 
 	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.PublicUnderscore
