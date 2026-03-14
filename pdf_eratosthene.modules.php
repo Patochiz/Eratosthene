@@ -1185,10 +1185,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// Total table
 		// col1x aligned with the CGV block start (right half of the page)
 		$col1x = $this->marge_gauche + ($this->page_largeur - $this->marge_gauche - $this->marge_droite - 5) / 2 + 5;
-		$col2x = 170;
-		if ($this->page_largeur < 210) { // To work with US executive format
-			$col2x -= 20;
-		}
+		$col2x = $col1x + ($this->page_largeur - $this->marge_droite - $col1x) / 2; // 50/50 split
 		$largcol2 = ($this->page_largeur - $this->marge_droite - $col2x);
 
 		$useborder = 0;
