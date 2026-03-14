@@ -1183,7 +1183,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetFont('', '', $default_font_size - 1);
 
 		// Total table
-		$col1x = 120;
+		// col1x aligned with the CGV block start (right half of the page)
+		$col1x = $this->marge_gauche + ($this->page_largeur - $this->marge_gauche - $this->marge_droite - 5) / 2 + 5;
 		$col2x = 170;
 		if ($this->page_largeur < 210) { // To work with US executive format
 			$col2x -= 20;
