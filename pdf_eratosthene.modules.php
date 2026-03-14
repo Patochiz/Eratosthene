@@ -674,11 +674,14 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 							$firstTitleEncountered = true;
 							$pdf->SetFont('', 'B', $default_font_size);
+							$pdf->SetFillColor(230, 230, 230);
+							$pdf->SetTextColor(0, 0, 60);
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
 							// Use dol_htmlentitiesbr to properly handle HTML entities and line breaks
-							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, dol_htmlentitiesbr($object->lines[$i]->desc), 0, 1, false, true, 'L', true);
+							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, dol_htmlentitiesbr($object->lines[$i]->desc), 0, 1, true, true, 'L', true);
 							$curY = $pdf->GetY();
+							$pdf->SetTextColor(0, 0, 0);
 						} else {
 							// Normal handling for products and regular services
 							// Modify description to include detail extrafield in 2 columns format
