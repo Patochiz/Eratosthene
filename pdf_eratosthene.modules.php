@@ -1738,6 +1738,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 					if (!empty($object->contact->email)) {
 						$carac_emetteur .= $outputlangs->transnoentities("Email") . ": " . $object->contact->email;
 					}
+
+					// Autre contact (extrafield)
+					if (!empty($object->contact->array_options['options_autre_contact'])) {
+						$carac_emetteur .= "\n" . $outputlangs->convToOutputCharset($object->contact->array_options['options_autre_contact']);
+					}
 				}
 			}
 
