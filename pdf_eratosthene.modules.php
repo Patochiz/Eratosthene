@@ -1391,7 +1391,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetTextColor(0, 0, 0);
 
 		// Ligne fluo et signature : positionnées juste après le bloc des totaux (HT/TVA/TTC)
-		$posy_after_totals = $tab2_top + $tab2_hl * ($index + 1);
+		$posy_after_totals = $tab2_top + $tab2_hl * ($index + 1) + 2; // +2mm d'espace au-dessus de la ligne fluo
 
 		// Ligne fluo : demande de retour de l'AR signé (pleine largeur = même largeur que le bloc signature)
 		$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
@@ -1412,16 +1412,15 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$largeur_colonne = ($largeur_ligne - $espace_entre_colonnes) / 2;
 
 		// Colonne gauche : BON POUR ACCORD dans un cadre (hauteur augmentée)
-		$hauteur_cadre_signature = 30;
+		$hauteur_cadre_signature = 25;
 		$pdf->Rect($this->marge_gauche, $posy_after_totals, $largeur_colonne, $hauteur_cadre_signature);
 		$pdf->SetXY($this->marge_gauche + 1, $posy_after_totals + 1);
 		$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
 		$pdf->MultiCell($largeur_colonne - 2, 4, "BON POUR ACCORD (TAMPON + SIGNATURE) :", 0, 'L', 0);
 
-		// Colonne droite : conditions de paiement, mode de règlement, puis CGV
-		$pdf->SetXY($this->marge_gauche + $largeur_colonne + $espace_entre_colonnes, $posy_after_totals);
-		$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
-		$texte_colonne_droite = '';
+		// Colonne droite : conditions de paiement, mode de règlement (police identique à l'ancienne version), puis CGV
+		$x_droite = $this->marge_gauche + $largeur_colonne + $espace_entre_colonnes;
+		$posy_droite = $posy_after_totals;
 
 		if ($object->cond_reglement_code || $object->cond_reglement) {
 			$lib_condition_paiement = ($outputlangs->transnoentities("PaymentCondition".$object->cond_reglement_code) != 'PaymentCondition'.$object->cond_reglement_code) ? $outputlangs->transnoentities("PaymentCondition".$object->cond_reglement_code) : $outputlangs->convToOutputCharset($object->cond_reglement_doc ? $object->cond_reglement_doc : $object->cond_reglement_label);
@@ -1429,17 +1428,33 @@ class pdf_eratosthene extends ModelePDFCommandes
 			if ($object->deposit_percent > 0) {
 				$lib_condition_paiement = str_replace('__DEPOSIT_PERCENT__', $object->deposit_percent, $lib_condition_paiement);
 			}
-			$texte_colonne_droite .= $outputlangs->transnoentities("PaymentConditions").' : '.$lib_condition_paiement."\n";
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($x_droite, $posy_droite);
+			$pdf->MultiCell($largeur_colonne, $tab2_hl, $outputlangs->transnoentities("PaymentConditions").':', 0, 'L', 0);
+			$posy_droite = $pdf->GetY();
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($x_droite, $posy_droite);
+			$pdf->MultiCell($largeur_colonne, $tab2_hl, $lib_condition_paiement, 0, 'L', 0);
+			$posy_droite = $pdf->GetY();
 		}
 
 		if ($object->mode_reglement_code || $object->mode_reglement) {
 			$lib_mode_reglement = ($outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code) ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
-			$texte_colonne_droite .= $outputlangs->transnoentities("PaymentMode").' : '.$lib_mode_reglement."\n";
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($x_droite, $posy_droite);
+			$pdf->MultiCell($largeur_colonne, $tab2_hl, $outputlangs->transnoentities("PaymentMode").':', 0, 'L', 0);
+			$posy_droite = $pdf->GetY();
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
+			$pdf->SetXY($x_droite, $posy_droite);
+			$pdf->MultiCell($largeur_colonne, $tab2_hl, $lib_mode_reglement, 0, 'L', 0);
+			$posy_droite = $pdf->GetY();
 		}
 
-		$texte_colonne_droite .= "Différence de bains possible pour suite de chantiers\n";
-		$texte_colonne_droite .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
-		$pdf->MultiCell($largeur_colonne, 3, $texte_colonne_droite, 0, 'L', 0);
+		$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
+		$pdf->SetXY($x_droite, $posy_droite);
+		$texte_cgv = "Différence de bains possible pour suite de chantiers\n";
+		$texte_cgv .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
+		$pdf->MultiCell($largeur_colonne, 3, $texte_cgv, 0, 'L', 0);
 
 		// Positionner Y après la zone la plus haute (signature ou conditions)
 		$posy_apres_signature = $posy_after_totals + $hauteur_cadre_signature + 1;
