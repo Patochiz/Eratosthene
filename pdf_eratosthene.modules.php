@@ -1385,88 +1385,83 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 
 
-		// Show payments conditions and payment mode in right column, below Total HT
+		// Conditions de paiement et mode de règlement affichés dans le bloc signature (colonne droite)
 		$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
 
-		if ($object->cond_reglement_code || $object->cond_reglement) {
-			$index++;
-			$pdf->SetFillColor(248, 248, 248);
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($col1x, $tab2_top + $tab2_hl * $index);
-			$titre = $outputlangs->transnoentities("PaymentConditions").':';
-			$pdf->MultiCell($col2x - $col1x, $tab2_hl, $titre, 0, 'L', 1);
+		$pdf->SetTextColor(0, 0, 0);
 
+		// Ligne fluo et signature : positionnées juste après le bloc des totaux (HT/TVA/TTC)
+		$posy_after_totals = $tab2_top + $tab2_hl * ($index + 1) + 2; // +2mm d'espace au-dessus de la ligne fluo
+
+		// Ligne fluo : demande de retour de l'AR signé (pleine largeur = même largeur que le bloc signature)
+		$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
+		$pdf->SetFillColor(255, 255, 0); // Jaune fluo
+		$pdf->SetTextColor(0, 0, 0);
+		$pdf->SetXY($this->marge_gauche, $posy_after_totals);
+		$largeur_ligne = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+		$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'C', 1);
+
+		$posy_after_totals = $pdf->GetY() + 2;
+
+		// Zone en deux colonnes : signature à gauche, conditions/mode + CGV à droite
+		$pdf->SetFillColor(255, 255, 255); // Fond blanc
+		$pdf->SetTextColor(0, 0, 0);
+
+		// Calcul des largeurs des colonnes (égales)
+		$espace_entre_colonnes = 5;
+		$largeur_colonne = ($largeur_ligne - $espace_entre_colonnes) / 2;
+
+		// Colonne gauche : BON POUR ACCORD dans un cadre (hauteur augmentée)
+		$hauteur_cadre_signature = 23;
+		$pdf->Rect($this->marge_gauche, $posy_after_totals, $largeur_colonne, $hauteur_cadre_signature);
+		$pdf->SetXY($this->marge_gauche + 1, $posy_after_totals + 1);
+		$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+		$pdf->MultiCell($largeur_colonne - 2, 4, "BON POUR ACCORD (TAMPON + SIGNATURE) :", 0, 'L', 0);
+
+		// Colonne droite : conditions de paiement, mode de règlement (police identique à l'ancienne version), puis CGV
+		$x_droite = $this->marge_gauche + $largeur_colonne + $espace_entre_colonnes;
+		$posy_droite = $posy_after_totals;
+
+		if ($object->cond_reglement_code || $object->cond_reglement) {
 			$lib_condition_paiement = ($outputlangs->transnoentities("PaymentCondition".$object->cond_reglement_code) != 'PaymentCondition'.$object->cond_reglement_code) ? $outputlangs->transnoentities("PaymentCondition".$object->cond_reglement_code) : $outputlangs->convToOutputCharset($object->cond_reglement_doc ? $object->cond_reglement_doc : $object->cond_reglement_label);
 			$lib_condition_paiement = str_replace('\n', "\n", $lib_condition_paiement);
 			if ($object->deposit_percent > 0) {
 				$lib_condition_paiement = str_replace('__DEPOSIT_PERCENT__', $object->deposit_percent, $lib_condition_paiement);
 			}
+			$label_cond = $outputlangs->transnoentities("PaymentConditions").': ';
+			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$w_label_cond = $pdf->GetStringWidth($label_cond);
+			$pdf->SetXY($x_droite, $posy_droite);
+			$pdf->Cell($w_label_cond, $tab2_hl, $label_cond, 0, 0, 'L', 0);
 			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($col2x, $tab2_top + $tab2_hl * $index);
-			$pdf->MultiCell($largcol2, $tab2_hl, $lib_condition_paiement, 0, 'R', 1);
+			$pdf->MultiCell($largeur_colonne - $w_label_cond, $tab2_hl, $lib_condition_paiement, 0, 'L', 0);
+			$posy_droite = $pdf->GetY();
 		}
 
 		if ($object->mode_reglement_code || $object->mode_reglement) {
-			$index++;
-			$pdf->SetFillColor(248, 248, 248);
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($col1x, $tab2_top + $tab2_hl * $index);
-			$titre_mode = $outputlangs->transnoentities("PaymentMode").':';
-			$pdf->MultiCell($col2x - $col1x, $tab2_hl, $titre_mode, 0, 'L', 1);
-
 			$lib_mode_reglement = ($outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code) ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($col2x, $tab2_top + $tab2_hl * $index);
-			$pdf->MultiCell($largcol2, $tab2_hl, $lib_mode_reglement, 0, 'R', 1);
-		}
-
-		$pdf->SetTextColor(0, 0, 0);
-
-		// Ligne fluo et signature : positionnées après le bloc des totaux + conditions/mode
-		if ($object->cond_reglement_code || $object->cond_reglement) {
-			$diffsizetitle = (!getDolGlobalString('PDF_DIFFSIZE_TITLE') ? 3 : $conf->global->PDF_DIFFSIZE_TITLE);
-			$posy_after_totals = $tab2_top + $tab2_hl * ($index + 1);
-
-			// Ligne fluo : demande de retour de l'AR signé
-			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle + 2);
-			$pdf->SetFillColor(255, 255, 0); // Jaune fluo
-			$pdf->SetTextColor(0, 0, 0);
-			$pdf->SetXY($this->marge_gauche, $posy_after_totals);
-			$largeur_ligne = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-			$pdf->MultiCell($largeur_ligne, 4, "NOUS RETOURNER VALIDATION DE CET AR (DATÉ ET SIGNÉ) SOUS 24h.", 0, 'C', 1);
-
-			$posy_after_totals = $pdf->GetY() + 2;
-
-			// Zone en deux colonnes : signature à gauche, conditions à droite
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle + 2);
-			$pdf->SetFillColor(255, 255, 255); // Fond blanc
-			$pdf->SetTextColor(0, 0, 0);
-
-			// Calcul des largeurs des colonnes (égales)
-			$espace_entre_colonnes = 5;
-			$largeur_colonne = ($largeur_ligne - $espace_entre_colonnes) / 2;
-
-			// Colonne gauche : BON POUR ACCORD dans un cadre
-			$hauteur_cadre_signature = 15;
-			$pdf->Rect($this->marge_gauche, $posy_after_totals, $largeur_colonne, $hauteur_cadre_signature);
-			$pdf->SetXY($this->marge_gauche + 1, $posy_after_totals + 1);
+			$label_mode = $outputlangs->transnoentities("PaymentMode").': ';
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
-			$pdf->MultiCell($largeur_colonne - 2, 4, "BON POUR ACCORD (TAMPON + SIGNATURE) :", 0, 'L', 0);
-
-			// Colonne droite : texte des conditions générales
-			$pdf->SetXY($this->marge_gauche + $largeur_colonne + $espace_entre_colonnes, $posy_after_totals);
-			$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
-			$texte_conditions = "Différence de bains possible pour suite de chantiers\n";
-			$texte_conditions .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
-			$pdf->MultiCell($largeur_colonne, 3, $texte_conditions, 0, 'L', 0);
-
-			// Positionner Y après la zone la plus haute (signature ou conditions)
-			$posy_apres_signature = $posy_after_totals + $hauteur_cadre_signature + 1;
-			$posy_apres_conditions = $pdf->GetY();
-			$pdf->SetY(max($posy_apres_signature, $posy_apres_conditions));
-
-			$posy_after_totals = $pdf->GetY() + 3;
+			$w_label_mode = $pdf->GetStringWidth($label_mode);
+			$pdf->SetXY($x_droite, $posy_droite);
+			$pdf->Cell($w_label_mode, $tab2_hl, $label_mode, 0, 0, 'L', 0);
+			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
+			$pdf->MultiCell($largeur_colonne - $w_label_mode, $tab2_hl, $lib_mode_reglement, 0, 'L', 0);
+			$posy_droite = $pdf->GetY();
 		}
+
+		$pdf->SetFont('', '', $default_font_size - $diffsizetitle - 1);
+		$pdf->SetXY($x_droite, $posy_droite);
+		$texte_cgv = "Différence de bains possible pour suite de chantiers\n";
+		$texte_cgv .= "Toute commande quelle qu'en soit la forme et le moyen de transmission, reçue par DIAMANT INDUSTRlE, implique leur acceptation sans réserve: voir Conditions Générales de Vente. Attribution de compétences : le règlement de tout litige entre les parties, quel qu'en soit la nature et la cause sera soumis aux tribunaux de Brest.";
+		$pdf->MultiCell($largeur_colonne, 3, $texte_cgv, 0, 'L', 0);
+
+		// Positionner Y après la zone la plus haute (signature ou conditions)
+		$posy_apres_signature = $posy_after_totals + $hauteur_cadre_signature + 1;
+		$posy_apres_conditions = $pdf->GetY();
+		$pdf->SetY(max($posy_apres_signature, $posy_apres_conditions));
+
+		$posy_after_totals = $pdf->GetY() + 3;
 
 		$index++;
 		if (!empty($posy_after_totals)) {
