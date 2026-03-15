@@ -1412,7 +1412,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$largeur_colonne = ($largeur_ligne - $espace_entre_colonnes) / 2;
 
 		// Colonne gauche : BON POUR ACCORD dans un cadre (hauteur augmentée)
-		$hauteur_cadre_signature = 25;
+		$hauteur_cadre_signature = 23;
 		$pdf->Rect($this->marge_gauche, $posy_after_totals, $largeur_colonne, $hauteur_cadre_signature);
 		$pdf->SetXY($this->marge_gauche + 1, $posy_after_totals + 1);
 		$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
