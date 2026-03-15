@@ -1428,25 +1428,25 @@ class pdf_eratosthene extends ModelePDFCommandes
 			if ($object->deposit_percent > 0) {
 				$lib_condition_paiement = str_replace('__DEPOSIT_PERCENT__', $object->deposit_percent, $lib_condition_paiement);
 			}
+			$label_cond = $outputlangs->transnoentities("PaymentConditions").': ';
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$w_label_cond = $pdf->GetStringWidth($label_cond);
 			$pdf->SetXY($x_droite, $posy_droite);
-			$pdf->MultiCell($largeur_colonne, $tab2_hl, $outputlangs->transnoentities("PaymentConditions").':', 0, 'L', 0);
-			$posy_droite = $pdf->GetY();
+			$pdf->Cell($w_label_cond, $tab2_hl, $label_cond, 0, 0, 'L', 0);
 			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($x_droite, $posy_droite);
-			$pdf->MultiCell($largeur_colonne, $tab2_hl, $lib_condition_paiement, 0, 'L', 0);
+			$pdf->MultiCell($largeur_colonne - $w_label_cond, $tab2_hl, $lib_condition_paiement, 0, 'L', 0);
 			$posy_droite = $pdf->GetY();
 		}
 
 		if ($object->mode_reglement_code || $object->mode_reglement) {
 			$lib_mode_reglement = ($outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) != 'PaymentType'.$object->mode_reglement_code) ? $outputlangs->transnoentities("PaymentType".$object->mode_reglement_code) : $outputlangs->convToOutputCharset($object->mode_reglement);
+			$label_mode = $outputlangs->transnoentities("PaymentMode").': ';
 			$pdf->SetFont('', 'B', $default_font_size - $diffsizetitle);
+			$w_label_mode = $pdf->GetStringWidth($label_mode);
 			$pdf->SetXY($x_droite, $posy_droite);
-			$pdf->MultiCell($largeur_colonne, $tab2_hl, $outputlangs->transnoentities("PaymentMode").':', 0, 'L', 0);
-			$posy_droite = $pdf->GetY();
+			$pdf->Cell($w_label_mode, $tab2_hl, $label_mode, 0, 0, 'L', 0);
 			$pdf->SetFont('', '', $default_font_size - $diffsizetitle);
-			$pdf->SetXY($x_droite, $posy_droite);
-			$pdf->MultiCell($largeur_colonne, $tab2_hl, $lib_mode_reglement, 0, 'L', 0);
+			$pdf->MultiCell($largeur_colonne - $w_label_mode, $tab2_hl, $lib_mode_reglement, 0, 'L', 0);
 			$posy_droite = $pdf->GetY();
 		}
 
