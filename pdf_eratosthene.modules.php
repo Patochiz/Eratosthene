@@ -1830,13 +1830,20 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$posx = $this->marge_gauche;
 			}
 
+			// Calcul de la hauteur dynamique du bloc "Adressé à" selon le contenu réel
+			$pdf->SetFont('', '', $default_font_size - 1);
+			$nbLignesClient = $pdf->getNumLines($carac_client, $widthrecbox - 4);
+			// 4mm par ligne + 3mm padding haut (SetXY posy+3) + 3mm marge basse
+			$hautcadre_client = max($hautcadre, $nbLignesClient * 4 + 6);
+			$extra_shift = max(0, $hautcadre_client - $hautcadre);
+
 			// Show recipient frame
 			if (!getDolGlobalString('MAIN_PDF_NO_RECIPENT_FRAME')) {
 				$pdf->SetTextColor(0, 0, 0);
 				$pdf->SetFont('', '', $default_font_size - 2);
 				$pdf->SetXY($posx + 2, $posy - 5);
 				$pdf->MultiCell($widthrecbox, 5, $outputlangs->transnoentities("Adressé à"), 0, $ltrdirection);
-				$pdf->Rect($posx, $posy, $widthrecbox, $hautcadre);
+				$pdf->Rect($posx, $posy, $widthrecbox, $hautcadre_client);
 			}
 
 			// Show recipient information
@@ -1844,9 +1851,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
 
-			// Force cursor position to be consistent regardless of content length
-			// This ensures the dates block always starts at the same position
-			$pdf->SetY($posy + $hautcadre + 2);
+			// Position le curseur après le bloc destinataire (hauteur dynamique)
+			$pdf->SetY($posy + $hautcadre_client + 2);
+
+			// Répercuter le surplus de hauteur sur top_shift pour décaler le reste du document
+			$top_shift += $extra_shift;
 		}
 
 		$pdf->SetTextColor(0, 0, 0);
