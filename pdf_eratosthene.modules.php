@@ -1667,7 +1667,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		$pdf->SetXY($posx, $posy);
 		$pdf->SetTextColor(0, 0, 60);
-		$pdf->MultiCell($w, 3, "du ".dol_print_date($object->date, "day", false, $outputlangs, true), '', 'R');
+		$pdf->MultiCell($w, 3, "du ".dol_print_date(dol_now(), "day", false, $outputlangs, true), '', 'R');
 
 		if (!getDolGlobalString('MAIN_PDF_HIDE_CUSTOMER_CODE') && !empty($object->thirdparty->code_client)) {
 			$posy += 4;
