@@ -1786,9 +1786,15 @@ class pdf_eratosthene extends ModelePDFCommandes
 				// Adresse du tiers
 				$carac_client .= pdf_build_address($outputlangs, $this->emetteur, $thirdparty, '', 0, 'target', $object);
 
-				// Téléphone
+				// Téléphone et Fax
 				if (!empty($thirdparty->phone)) {
-					$carac_client .= "\n" . $outputlangs->transnoentities("Phone") . ": " . $thirdparty->phone;
+					$line = "\n" . $outputlangs->transnoentities("Phone") . ": " . $thirdparty->phone;
+					if (!empty($thirdparty->fax)) {
+						$line .= " - " . $outputlangs->transnoentities("Fax") . ": " . $thirdparty->fax;
+					}
+					$carac_client .= $line;
+				} elseif (!empty($thirdparty->fax)) {
+					$carac_client .= "\n" . $outputlangs->transnoentities("Fax") . ": " . $thirdparty->fax;
 				}
 
 				// Email
