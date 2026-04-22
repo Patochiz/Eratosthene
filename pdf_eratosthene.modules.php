@@ -707,7 +707,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 							if (!empty($object->lines[$i]->array_options['options_montant_ecotaxe'])) {
 								$ecotaxe_value = price2num($object->lines[$i]->array_options['options_montant_ecotaxe']);
 								$ecotaxe = price($ecotaxe_value, 0, $outputlangs, 1, -1, -1, $conf->currency);
-								$object->lines[$i]->desc .= '<br><i>Éco-participation : ' . $ecotaxe . '</i>';
+								$prefix = !empty(trim(strip_tags($object->lines[$i]->desc))) ? '<br>' : '';
+								$object->lines[$i]->desc .= $prefix . '<i>Éco-participation : ' . $ecotaxe . '</i>';
 							}
 
 							$pdf->startTransaction();
