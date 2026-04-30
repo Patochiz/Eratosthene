@@ -2212,10 +2212,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetXY($this->marge_gauche + $col_w + 2, $posy + 14);
 		$pdf->Cell($col_w - 4, 5, 'Signature et cachet :', 0, 1, 'L');
 
-		// Restaurer les paramètres PDF originaux
+		// Restaurer les paramètres PDF originaux et ajouter le pied de page avec numérotation
 		$pdf->SetAutoPageBreak(1, 0);
 		$pdf->SetTextColor(0, 0, 0);
 		$pdf->SetDrawColor(128, 128, 128);
+		$this->_pagefoot($pdf, $object, $outputlangs);
 	}
 
 
