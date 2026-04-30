@@ -2130,14 +2130,24 @@ class pdf_eratosthene extends ModelePDFCommandes
 			|| stripos($mode_label, 'prelevement') !== false
 		);
 		if ($is_prelevement) {
-			$bac = new CompanyBankAccount($this->db);
+			// Requête directe sur llx_societe_rib pour éviter les aléas du paramétrage CompanyBankAccount::fetch()
 			$rib_iban   = '';
 			$rib_bic    = '';
 			$rib_number = '';
-			if ($bac->fetch(0, $thirdparty->id) > 0) {
-				$rib_iban   = $bac->iban;
-				$rib_bic    = $bac->bic;
-				$rib_number = $bac->number;
+			$sql_rib = "SELECT iban_prefix, bic, number"
+				." FROM ".MAIN_DB_PREFIX."societe_rib"
+				." WHERE fk_soc = ".((int) $thirdparty->id)
+				." ORDER BY default_rib DESC, rowid ASC"
+				." LIMIT 1";
+			$res_rib = $this->db->query($sql_rib);
+			if ($res_rib) {
+				$obj_rib = $this->db->fetch_object($res_rib);
+				if ($obj_rib) {
+					$rib_iban   = $obj_rib->iban_prefix;
+					$rib_bic    = $obj_rib->bic;
+					$rib_number = $obj_rib->number;
+				}
+				$this->db->free($res_rib);
 			}
 			$drawRow('IBAN :', $rib_iban);
 			$drawRow('BIC :', $rib_bic);
