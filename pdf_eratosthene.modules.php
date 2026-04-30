@@ -1918,12 +1918,13 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// Add new page
 		$pdf->AddPage();
 		$pdf->SetMargins($this->marge_gauche, $this->marge_haute, $this->marge_droite);
-		$pdf->SetAutoPageBreak(true, $this->marge_basse + 10);
+		$pdf->SetAutoPageBreak(false);
 		$pdf->SetTextColor(0, 0, 0);
 
-		$pageWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
-		$labelW = 58;
-		$valueW = $pageWidth - $labelW;
+		$pageWidth   = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+		$labelW      = 58;
+		$valueW      = $pageWidth - $labelW;
+		$footer_height = $this->marge_basse + 25; // espace réservé pour le pied de page
 
 		$posy = $this->marge_haute;
 
@@ -1956,8 +1957,22 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// Helpers internes
 		// -------------------------------------------------------
 
+		// Déclenche un saut de page si $needed mm ne tiennent plus avant le pied de page
+		$checkPageBreak = function ($needed) use (&$pdf, &$posy, $footer_height, $default_font_size, $object, $outputlangs) {
+			if ($posy + $needed > $this->page_hauteur - $footer_height) {
+				$this->_pagefoot($pdf, $object, $outputlangs);
+				$pdf->AddPage();
+				$pdf->SetMargins($this->marge_gauche, $this->marge_haute, $this->marge_droite);
+				$pdf->SetTextColor(0, 0, 0);
+				$pdf->SetDrawColor(128, 128, 128);
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$posy = $this->marge_haute;
+			}
+		};
+
 		// Dessine une ligne label (gras) + valeur ; affiche "À COMPLÉTER" en gris si vide
-		$drawRow = function ($label, $value) use (&$pdf, &$posy, $default_font_size, $labelW, $valueW) {
+		$drawRow = function ($label, $value) use (&$pdf, &$posy, $default_font_size, $labelW, $valueW, $checkPageBreak) {
+			$checkPageBreak(8);
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$pdf->SetFont('', 'B', $default_font_size - 1);
 			$pdf->Cell($labelW, 5, $label, 0, 0, 'L');
@@ -1975,7 +1990,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		};
 
 		// Dessine un en-tête de section avec fond gris
-		$drawSection = function ($title) use (&$pdf, &$posy, $default_font_size, $pageWidth) {
+		$drawSection = function ($title) use (&$pdf, &$posy, $default_font_size, $pageWidth, $checkPageBreak) {
+			$checkPageBreak(20); // en-tête + au moins une ligne de contenu
 			$posy += 4;
 			$pdf->SetFont('', 'B', $default_font_size);
 			$pdf->SetFillColor(210, 210, 210);
@@ -2186,6 +2202,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 					$contact_line .= ' — '.$c->email;
 				}
 
+				$checkPageBreak(8);
 				$pdf->SetXY($this->marge_gauche + 2, $posy);
 				$pdf->SetFont('', '', $default_font_size - 1);
 				$pdf->MultiCell($pageWidth - 2, 5, $outputlangs->convToOutputCharset($contact_line), 0, 'L', false, 1);
@@ -2204,6 +2221,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// -------------------------------------------------------
 		// ENCART DE VALIDATION
 		// -------------------------------------------------------
+		// Hauteur totale de l'encart : espacement (8) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
+		$checkPageBreak(56);
 		$posy += 8;
 
 		// Titre de l'encart
@@ -2236,8 +2255,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetXY($this->marge_gauche + $col_w + 2, $posy + 14);
 		$pdf->Cell($col_w - 4, 5, 'Signature et cachet :', 0, 1, 'L');
 
-		// Restaurer les paramètres PDF originaux et ajouter le pied de page avec numérotation
-		$pdf->SetAutoPageBreak(1, 0);
+		// Pied de page de la dernière page
 		$pdf->SetTextColor(0, 0, 0);
 		$pdf->SetDrawColor(128, 128, 128);
 		$this->_pagefoot($pdf, $object, $outputlangs);
