@@ -2011,14 +2011,29 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// -------------------------------------------------------
 		$drawSection('2. INFORMATIONS DE FACTURATION');
 
-		// Contact de facturation lié à la commande (type BILLING)
+		// Contact de facturation : contact de ce tiers ayant le rôle BILLING (tous éléments confondus)
+		// Correspond au statut "Facture - Contact client Facturation" visible sur la fiche tiers
 		$billing_contact = null;
-		$billing_ids = $object->getIdContact('external', 'BILLING');
-		if (!empty($billing_ids)) {
-			$billing_contact = new Contact($this->db);
-			if ($billing_contact->fetch($billing_ids[0]) <= 0) {
-				$billing_contact = null;
+
+		$sql_billing = "SELECT DISTINCT ec.fk_socpeople"
+			." FROM ".MAIN_DB_PREFIX."element_contact ec"
+			." JOIN ".MAIN_DB_PREFIX."c_type_contact ctc ON ctc.rowid = ec.fk_c_type_contact"
+			." JOIN ".MAIN_DB_PREFIX."socpeople sp ON sp.rowid = ec.fk_socpeople"
+			." WHERE sp.fk_soc = ".((int) $thirdparty->id)
+			." AND sp.entity IN (".getEntity('contact').")"
+			." AND ctc.code = 'BILLING'"
+			." AND ctc.source = 'external'"
+			." ORDER BY ec.rowid DESC";
+		$resql_billing = $this->db->query($sql_billing);
+		if ($resql_billing) {
+			$obj_billing = $this->db->fetch_object($resql_billing);
+			if ($obj_billing) {
+				$billing_contact = new Contact($this->db);
+				if ($billing_contact->fetch($obj_billing->fk_socpeople) <= 0) {
+					$billing_contact = null;
+				}
 			}
+			$this->db->free($resql_billing);
 		}
 
 		if ($billing_contact) {
@@ -2038,23 +2053,57 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy += 2;
 		}
 
-		// Conditions de règlement du tiers
+		// Conditions de règlement : depuis le tiers, avec fallback DB puis commande
 		$cond_label = '';
 		if (!empty($thirdparty->cond_reglement_code)) {
 			$trans = $outputlangs->transnoentities('PaymentCondition'.$thirdparty->cond_reglement_code);
-			$cond_label = ($trans != 'PaymentCondition'.$thirdparty->cond_reglement_code)
+			$cond_label = ($trans !== 'PaymentCondition'.$thirdparty->cond_reglement_code)
 				? $trans
-				: $outputlangs->convToOutputCharset(isset($thirdparty->cond_reglement_doc) && $thirdparty->cond_reglement_doc ? $thirdparty->cond_reglement_doc : (isset($thirdparty->cond_reglement) ? $thirdparty->cond_reglement : ''));
+				: $outputlangs->convToOutputCharset(!empty($thirdparty->cond_reglement_doc) ? $thirdparty->cond_reglement_doc : (isset($thirdparty->cond_reglement) ? $thirdparty->cond_reglement : ''));
+		} elseif (!empty($thirdparty->cond_reglement_id)) {
+			// Fallback : lecture directe en DB
+			$sql_cond = "SELECT code, libelle FROM ".MAIN_DB_PREFIX."c_payment_term WHERE rowid = ".((int) $thirdparty->cond_reglement_id);
+			$res_cond = $this->db->query($sql_cond);
+			if ($res_cond && ($obj_cond = $this->db->fetch_object($res_cond))) {
+				$trans = $outputlangs->transnoentities('PaymentCondition'.$obj_cond->code);
+				$cond_label = ($trans !== 'PaymentCondition'.$obj_cond->code) ? $trans : $outputlangs->convToOutputCharset($obj_cond->libelle);
+			}
+		}
+		// Fallback final : conditions de la commande
+		if (empty($cond_label) && !empty($object->cond_reglement_code)) {
+			$trans = $outputlangs->transnoentities('PaymentCondition'.$object->cond_reglement_code);
+			$cond_label = ($trans !== 'PaymentCondition'.$object->cond_reglement_code)
+				? $trans
+				: $outputlangs->convToOutputCharset(!empty($object->cond_reglement_doc) ? $object->cond_reglement_doc : $object->cond_reglement_label);
 		}
 		$drawRow('Conditions de règlement :', $cond_label);
 
-		// Mode de règlement du tiers
+		// Mode de règlement : depuis le tiers, avec fallback DB puis commande
 		$mode_label = '';
 		if (!empty($thirdparty->mode_reglement_code)) {
 			$trans = $outputlangs->transnoentities('PaymentType'.$thirdparty->mode_reglement_code);
-			$mode_label = ($trans != 'PaymentType'.$thirdparty->mode_reglement_code)
+			$mode_label = ($trans !== 'PaymentType'.$thirdparty->mode_reglement_code)
 				? $trans
 				: $outputlangs->convToOutputCharset(isset($thirdparty->mode_reglement) ? $thirdparty->mode_reglement : '');
+		} elseif (!empty($thirdparty->mode_reglement_id)) {
+			// Fallback : lecture directe en DB
+			$sql_mode = "SELECT code, libelle FROM ".MAIN_DB_PREFIX."c_paiement WHERE id = ".((int) $thirdparty->mode_reglement_id);
+			$res_mode = $this->db->query($sql_mode);
+			if ($res_mode && ($obj_mode = $this->db->fetch_object($res_mode))) {
+				$trans = $outputlangs->transnoentities('PaymentType'.$obj_mode->code);
+				$mode_label = ($trans !== 'PaymentType'.$obj_mode->code) ? $trans : $outputlangs->convToOutputCharset($obj_mode->libelle);
+				$thirdparty->mode_reglement_code = $obj_mode->code; // mémoriser pour le test RIB
+			}
+		}
+		// Fallback final : mode de la commande
+		if (empty($mode_label) && !empty($object->mode_reglement_code)) {
+			$trans = $outputlangs->transnoentities('PaymentType'.$object->mode_reglement_code);
+			$mode_label = ($trans !== 'PaymentType'.$object->mode_reglement_code)
+				? $trans
+				: $outputlangs->convToOutputCharset($object->mode_reglement);
+			if (empty($thirdparty->mode_reglement_code)) {
+				$thirdparty->mode_reglement_code = $object->mode_reglement_code;
+			}
 		}
 		$drawRow('Mode de règlement :', $mode_label);
 
