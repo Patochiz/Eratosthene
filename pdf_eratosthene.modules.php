@@ -35,6 +35,8 @@ require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+require_once DOL_DOCUMENT_ROOT.'/societe/class/companybankaccount.class.php';
 
 
 /**
@@ -1006,6 +1008,12 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 				// Pagefoot
 				$this->_pagefoot($pdf, $object, $outputlangs);
+
+				// Page fiche de renseignement client (si extrafield info_client coché)
+				if (!empty($object->array_options['options_info_client'])) {
+					$this->_drawClientInfoPage($pdf, $object, $outputlangs);
+				}
+
 				if (method_exists($pdf, 'AliasNbPages')) {
 					$pdf->AliasNbPages();
 				}
@@ -1887,6 +1895,371 @@ class pdf_eratosthene extends ModelePDFCommandes
 		return pdf_pagefoot($pdf, $outputlangs, 'ORDER_FREE_TEXT', $this->emetteur, $this->marge_basse, $this->marge_gauche, $this->page_hauteur, $object, $showdetails, $hidefreetext, $this->page_largeur, $this->watermark);
 	}
 
+
+
+	/**
+	 *  Draw the "Fiche de renseignement client" page (appended when extrafield info_client is checked).
+	 *
+	 *  @param  TCPDF       $pdf            Object PDF
+	 *  @param  Commande    $object         Object order
+	 *  @param  Translate   $outputlangs    Langs object
+	 *  @return void
+	 */
+	protected function _drawClientInfoPage(&$pdf, $object, $outputlangs)
+	{
+		global $conf, $mysoc;
+
+		$default_font_size = pdf_getPDFFontSize($outputlangs);
+		$thirdparty = $object->thirdparty;
+
+		// Load thirdparty extrafields if not already loaded
+		$thirdparty->fetch_optionals();
+
+		// Add new page
+		$pdf->AddPage();
+		$pdf->SetMargins($this->marge_gauche, $this->marge_haute, $this->marge_droite);
+		$pdf->SetAutoPageBreak(false);
+		$pdf->SetTextColor(0, 0, 0);
+
+		$pageWidth   = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
+		$labelW      = 58;
+		$valueW      = $pageWidth - $labelW;
+		$footer_height = $this->marge_basse + 25; // espace réservé pour le pied de page
+
+		$posy = $this->marge_haute;
+
+		// === LOGO (haut gauche) ===
+		$logo_height = 12;
+		if (!getDolGlobalInt('PDF_DISABLE_MYCOMPANY_LOGO') && $this->emetteur->logo) {
+			$logodir = $conf->mycompany->dir_output;
+			if (!empty(getMultidirOutput($mysoc, 'mycompany'))) {
+				$logodir = getMultidirOutput($mysoc, 'mycompany');
+			}
+			$logo = getDolGlobalInt('MAIN_PDF_USE_LARGE_LOGO')
+				? $logodir.'/logos/'.$this->emetteur->logo
+				: $logodir.'/logos/thumbs/'.$this->emetteur->logo_small;
+			if (is_readable($logo)) {
+				$logo_height = pdf_getHeightForLogo($logo);
+				$pdf->Image($logo, $this->marge_gauche, $posy, 0, $logo_height);
+			}
+		}
+
+		// === TITRE : même police, taille et couleur que le document principal ===
+		$pdf->SetFont('', 'B', $default_font_size + 3);
+		$pdf->SetTextColor(0, 0, 60);
+		$pdf->SetXY($this->marge_gauche, $posy);
+		$pdf->MultiCell($pageWidth, max($logo_height, 8), 'FICHE DE RENSEIGNEMENT CLIENT', 0, 'C', false, 1);
+		$posy = $pdf->GetY() + 6;
+
+		$pdf->SetTextColor(0, 0, 0);
+
+		// -------------------------------------------------------
+		// Helpers internes
+		// -------------------------------------------------------
+
+		// Déclenche un saut de page si $needed mm ne tiennent plus avant le pied de page
+		$checkPageBreak = function ($needed) use (&$pdf, &$posy, $footer_height, $default_font_size, $object, $outputlangs) {
+			if ($posy + $needed > $this->page_hauteur - $footer_height) {
+				$this->_pagefoot($pdf, $object, $outputlangs);
+				$pdf->AddPage();
+				$pdf->SetMargins($this->marge_gauche, $this->marge_haute, $this->marge_droite);
+				$pdf->SetTextColor(0, 0, 0);
+				$pdf->SetDrawColor(128, 128, 128);
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$posy = $this->marge_haute;
+			}
+		};
+
+		// Dessine une ligne label (gras) + valeur ; affiche "À COMPLÉTER" en gris si vide
+		$drawRow = function ($label, $value) use (&$pdf, &$posy, $default_font_size, $labelW, $valueW, $checkPageBreak) {
+			$checkPageBreak(8);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->SetFont('', 'B', $default_font_size - 1);
+			$pdf->Cell($labelW, 5, $label, 0, 0, 'L');
+			$pdf->SetXY($this->marge_gauche + $labelW, $posy);
+			if ((string) $value === '' || $value === null) {
+				$pdf->SetFont('', 'I', $default_font_size - 1);
+				$pdf->SetTextColor(160, 160, 160);
+				$pdf->MultiCell($valueW, 5, 'À COMPLÉTER', 0, 'L', false, 1);
+				$pdf->SetTextColor(0, 0, 0);
+			} else {
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$pdf->MultiCell($valueW, 5, (string) $value, 0, 'L', false, 1);
+			}
+			$posy = $pdf->GetY();
+		};
+
+		// Dessine un en-tête de section avec fond gris
+		$drawSection = function ($title) use (&$pdf, &$posy, $default_font_size, $pageWidth, $checkPageBreak) {
+			$checkPageBreak(20); // en-tête + au moins une ligne de contenu
+			$posy += 4;
+			$pdf->SetFont('', 'B', $default_font_size);
+			$pdf->SetFillColor(210, 210, 210);
+			$pdf->SetTextColor(0, 0, 60);
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->Cell($pageWidth, 6, $title, 0, 1, 'L', true);
+			$pdf->SetFillColor(255, 255, 255);
+			$pdf->SetTextColor(0, 0, 0);
+			$posy = $pdf->GetY() + 2;
+		};
+
+		// -------------------------------------------------------
+		// SECTION 1 : INFORMATIONS GÉNÉRALES DE LA SOCIÉTÉ
+		// -------------------------------------------------------
+		$drawSection('1. INFORMATIONS GÉNÉRALES DE LA SOCIÉTÉ');
+
+		$drawRow('Raison sociale :', $outputlangs->convToOutputCharset($thirdparty->name));
+		$drawRow('Adresse :', $outputlangs->convToOutputCharset($thirdparty->address));
+		$drawRow('CP / Ville :', trim($thirdparty->zip.' '.$thirdparty->town));
+
+		$country_label = '';
+		if (!empty($thirdparty->country)) {
+			$country_label = $outputlangs->convToOutputCharset($thirdparty->country);
+		} elseif (!empty($thirdparty->country_code)) {
+			$country_label = $outputlangs->transnoentitiesnoconv('Country'.$thirdparty->country_code);
+		}
+		$drawRow('Pays :', $country_label);
+		$drawRow('Téléphone :', $thirdparty->phone);
+		$drawRow('Fax :', $thirdparty->fax);
+		$drawRow('E-mail :', $thirdparty->email);
+
+		$posy += 2;
+		$drawRow('SIREN :', $thirdparty->idprof1);
+		$drawRow('SIRET :', $thirdparty->idprof2);
+		$drawRow('NAF-APE :', $thirdparty->idprof3);
+		$drawRow('N° DE TVA :', $thirdparty->tva_intra);
+
+		// -------------------------------------------------------
+		// SECTION 2 : INFORMATIONS DE FACTURATION
+		// -------------------------------------------------------
+		$drawSection('2. INFORMATIONS DE FACTURATION');
+
+		// Contact de facturation : contact de ce tiers ayant le rôle BILLING (tous éléments confondus)
+		// Correspond au statut "Facture - Contact client Facturation" visible sur la fiche tiers
+		$billing_contact = null;
+
+		$sql_billing = "SELECT DISTINCT ec.fk_socpeople"
+			." FROM ".MAIN_DB_PREFIX."element_contact ec"
+			." JOIN ".MAIN_DB_PREFIX."c_type_contact ctc ON ctc.rowid = ec.fk_c_type_contact"
+			." JOIN ".MAIN_DB_PREFIX."socpeople sp ON sp.rowid = ec.fk_socpeople"
+			." WHERE sp.fk_soc = ".((int) $thirdparty->id)
+			." AND sp.entity IN (".getEntity('contact').")"
+			." AND ctc.code = 'BILLING'"
+			." AND ctc.source = 'external'"
+			." ORDER BY ec.rowid DESC";
+		$resql_billing = $this->db->query($sql_billing);
+		if ($resql_billing) {
+			$obj_billing = $this->db->fetch_object($resql_billing);
+			if ($obj_billing) {
+				$billing_contact = new Contact($this->db);
+				if ($billing_contact->fetch($obj_billing->fk_socpeople) <= 0) {
+					$billing_contact = null;
+				}
+			}
+			$this->db->free($resql_billing);
+		}
+
+		// Toujours afficher les champs du contact (À COMPLÉTER si non trouvé)
+		if ($billing_contact) {
+			$bc_name    = $outputlangs->convToOutputCharset($billing_contact->getFullName($outputlangs));
+			$bc_address = $outputlangs->convToOutputCharset($billing_contact->address);
+			$bc_cpville = trim($billing_contact->zip.' '.$billing_contact->town);
+			$bc_country = '';
+			if (!empty($billing_contact->country)) {
+				$bc_country = $outputlangs->convToOutputCharset($billing_contact->country);
+			} elseif (!empty($billing_contact->country_code)) {
+				$bc_country = $outputlangs->transnoentitiesnoconv('Country'.$billing_contact->country_code);
+			}
+			$bc_phone = $billing_contact->phone_pro ?: $billing_contact->phone_mobile;
+			$bc_fax   = $billing_contact->fax;
+			$bc_email = $billing_contact->email;
+		} else {
+			$bc_name = $bc_address = $bc_cpville = $bc_country = $bc_phone = $bc_fax = $bc_email = '';
+		}
+		$drawRow('Nom :', $bc_name);
+		$drawRow('Adresse :', $bc_address);
+		$drawRow('CP / Ville :', $bc_cpville);
+		$drawRow('Pays :', $bc_country);
+		$drawRow('Téléphone :', $bc_phone);
+		$drawRow('Fax :', $bc_fax);
+		$drawRow('E-mail :', $bc_email);
+		$posy += 2;
+
+		// Conditions de règlement : depuis le tiers, avec fallback DB puis commande
+		$cond_label = '';
+		if (!empty($thirdparty->cond_reglement_code)) {
+			$trans = $outputlangs->transnoentities('PaymentCondition'.$thirdparty->cond_reglement_code);
+			$cond_label = ($trans !== 'PaymentCondition'.$thirdparty->cond_reglement_code)
+				? $trans
+				: $outputlangs->convToOutputCharset(!empty($thirdparty->cond_reglement_doc) ? $thirdparty->cond_reglement_doc : (isset($thirdparty->cond_reglement) ? $thirdparty->cond_reglement : ''));
+		} elseif (!empty($thirdparty->cond_reglement_id)) {
+			// Fallback : lecture directe en DB
+			$sql_cond = "SELECT code, libelle FROM ".MAIN_DB_PREFIX."c_payment_term WHERE rowid = ".((int) $thirdparty->cond_reglement_id);
+			$res_cond = $this->db->query($sql_cond);
+			if ($res_cond && ($obj_cond = $this->db->fetch_object($res_cond))) {
+				$trans = $outputlangs->transnoentities('PaymentCondition'.$obj_cond->code);
+				$cond_label = ($trans !== 'PaymentCondition'.$obj_cond->code) ? $trans : $outputlangs->convToOutputCharset($obj_cond->libelle);
+			}
+		}
+		// Fallback final : conditions de la commande
+		if (empty($cond_label) && !empty($object->cond_reglement_code)) {
+			$trans = $outputlangs->transnoentities('PaymentCondition'.$object->cond_reglement_code);
+			$cond_label = ($trans !== 'PaymentCondition'.$object->cond_reglement_code)
+				? $trans
+				: $outputlangs->convToOutputCharset(!empty($object->cond_reglement_doc) ? $object->cond_reglement_doc : $object->cond_reglement_label);
+		}
+		$drawRow('Conditions de règlement :', $cond_label);
+
+		// Mode de règlement : depuis le tiers, avec fallback DB puis commande
+		$mode_label = '';
+		if (!empty($thirdparty->mode_reglement_code)) {
+			$trans = $outputlangs->transnoentities('PaymentType'.$thirdparty->mode_reglement_code);
+			$mode_label = ($trans !== 'PaymentType'.$thirdparty->mode_reglement_code)
+				? $trans
+				: $outputlangs->convToOutputCharset(isset($thirdparty->mode_reglement) ? $thirdparty->mode_reglement : '');
+		} elseif (!empty($thirdparty->mode_reglement_id)) {
+			// Fallback : lecture directe en DB
+			$sql_mode = "SELECT code, libelle FROM ".MAIN_DB_PREFIX."c_paiement WHERE id = ".((int) $thirdparty->mode_reglement_id);
+			$res_mode = $this->db->query($sql_mode);
+			if ($res_mode && ($obj_mode = $this->db->fetch_object($res_mode))) {
+				$trans = $outputlangs->transnoentities('PaymentType'.$obj_mode->code);
+				$mode_label = ($trans !== 'PaymentType'.$obj_mode->code) ? $trans : $outputlangs->convToOutputCharset($obj_mode->libelle);
+				$thirdparty->mode_reglement_code = $obj_mode->code; // mémoriser pour le test RIB
+			}
+		}
+		// Fallback final : mode de la commande
+		if (empty($mode_label) && !empty($object->mode_reglement_code)) {
+			$trans = $outputlangs->transnoentities('PaymentType'.$object->mode_reglement_code);
+			$mode_label = ($trans !== 'PaymentType'.$object->mode_reglement_code)
+				? $trans
+				: $outputlangs->convToOutputCharset($object->mode_reglement);
+			if (empty($thirdparty->mode_reglement_code)) {
+				$thirdparty->mode_reglement_code = $object->mode_reglement_code;
+			}
+		}
+		$drawRow('Mode de règlement :', $mode_label);
+
+		// RIB si mode prélèvement : détecté par code PRE ou libellé contenant "prélèvement"
+		$is_prelevement = !empty($thirdparty->mode_reglement_code) && (
+			strtoupper($thirdparty->mode_reglement_code) === 'PRE'
+			|| stripos($mode_label, 'prélèvement') !== false
+			|| stripos($mode_label, 'prelevement') !== false
+		);
+		if ($is_prelevement) {
+			// Requête directe sur llx_societe_rib pour éviter les aléas du paramétrage CompanyBankAccount::fetch()
+			$rib_iban   = '';
+			$rib_bic    = '';
+			$rib_number = '';
+			$sql_rib = "SELECT iban_prefix, bic, number"
+				." FROM ".MAIN_DB_PREFIX."societe_rib"
+				." WHERE fk_soc = ".((int) $thirdparty->id)
+				." ORDER BY default_rib DESC, rowid ASC"
+				." LIMIT 1";
+			$res_rib = $this->db->query($sql_rib);
+			if ($res_rib) {
+				$obj_rib = $this->db->fetch_object($res_rib);
+				if ($obj_rib) {
+					$rib_iban   = $obj_rib->iban_prefix;
+					$rib_bic    = $obj_rib->bic;
+					$rib_number = $obj_rib->number;
+				}
+				$this->db->free($res_rib);
+			}
+			$drawRow('IBAN :', $rib_iban);
+			$drawRow('BIC :', $rib_bic);
+			$drawRow('N° compte :', $rib_number);
+		}
+
+		// Extrafield information_facturation du tiers
+		if (!empty($thirdparty->array_options['options_information_facturation'])) {
+			$drawRow('Informations de facturation :', $outputlangs->convToOutputCharset($thirdparty->array_options['options_information_facturation']));
+		}
+
+		// -------------------------------------------------------
+		// SECTION 3 : CONTACTS DE L'ENTREPRISE
+		// -------------------------------------------------------
+		$drawSection('3. CONTACTS DE L\'ENTREPRISE');
+
+		// IDs des contacts livraison à exclure
+		$shipping_ids = $object->getIdContact('external', 'SHIPPING');
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."socpeople"
+			." WHERE fk_soc = ".((int) $thirdparty->id)
+			." AND entity IN (".getEntity('contact').")"
+			." ORDER BY lastname, firstname";
+		$resql = $this->db->query($sql);
+		$has_contacts = false;
+		if ($resql) {
+			while ($obj = $this->db->fetch_object($resql)) {
+				if (in_array($obj->rowid, $shipping_ids)) {
+					continue;
+				}
+				$c = new Contact($this->db);
+				$c->fetch($obj->rowid);
+
+				$contact_line = trim($c->firstname.' '.$c->lastname);
+				if (!empty($c->email)) {
+					$contact_line .= ' — '.$c->email;
+				}
+
+				$checkPageBreak(8);
+				$pdf->SetXY($this->marge_gauche + 2, $posy);
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$pdf->MultiCell($pageWidth - 2, 5, $outputlangs->convToOutputCharset($contact_line), 0, 'L', false, 1);
+				$posy = $pdf->GetY();
+				$has_contacts = true;
+			}
+			$this->db->free($resql);
+		}
+		if (!$has_contacts) {
+			$pdf->SetXY($this->marge_gauche + 2, $posy);
+			$pdf->SetFont('', 'I', $default_font_size - 1);
+			$pdf->MultiCell($pageWidth - 2, 5, '—', 0, 'L', false, 1);
+			$posy = $pdf->GetY();
+		}
+
+		// -------------------------------------------------------
+		// ENCART DE VALIDATION
+		// -------------------------------------------------------
+		// Hauteur totale de l'encart : espacement (8) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
+		$checkPageBreak(56);
+		$posy += 8;
+
+		// Titre de l'encart
+		$pdf->SetFont('', 'B', $default_font_size);
+		$pdf->SetTextColor(0, 0, 60);
+		$pdf->SetXY($this->marge_gauche, $posy);
+		$pdf->MultiCell($pageWidth, 6, 'VALIDATION DES INFORMATIONS', 0, 'C', false, 1);
+		$posy = $pdf->GetY() + 2;
+
+		$pdf->SetTextColor(0, 0, 0);
+		$pdf->SetFont('', '', $default_font_size - 1);
+		$pdf->SetXY($this->marge_gauche, $posy);
+		$pdf->MultiCell($pageWidth, 5, "Je soussigné(e), certifie l'exactitude des informations ci-dessus et m'engage à signaler toute modification.", 0, 'L', false, 1);
+		$posy = $pdf->GetY() + 3;
+
+		// Cadre de signature
+		$sig_height = 32;
+		$pdf->SetDrawColor(0, 0, 0);
+		$pdf->Rect($this->marge_gauche, $posy, $pageWidth, $sig_height);
+
+		$col_w = $pageWidth / 2;
+		$pdf->SetFont('', '', $default_font_size - 1);
+
+		$pdf->SetXY($this->marge_gauche + 2, $posy + 3);
+		$pdf->MultiCell($pageWidth - 4, 5, 'Nom et prénom : .........................................................', 0, 'L', false, 1);
+
+		$pdf->SetXY($this->marge_gauche + 2, $posy + 14);
+		$pdf->Cell($col_w - 4, 5, 'Date : ..........................................', 0, 0, 'L');
+
+		$pdf->SetXY($this->marge_gauche + $col_w + 2, $posy + 14);
+		$pdf->Cell($col_w - 4, 5, 'Signature et cachet :', 0, 1, 'L');
+
+		// Pied de page de la dernière page
+		$pdf->SetTextColor(0, 0, 0);
+		$pdf->SetDrawColor(128, 128, 128);
+		$this->_pagefoot($pdf, $object, $outputlangs);
+	}
 
 
 	/**
