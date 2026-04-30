@@ -1956,14 +1956,21 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// Helpers internes
 		// -------------------------------------------------------
 
-		// Dessine une ligne label (gras) + valeur sur une seule ligne
+		// Dessine une ligne label (gras) + valeur ; affiche "À COMPLÉTER" en gris si vide
 		$drawRow = function ($label, $value) use (&$pdf, &$posy, $default_font_size, $labelW, $valueW) {
 			$pdf->SetXY($this->marge_gauche, $posy);
 			$pdf->SetFont('', 'B', $default_font_size - 1);
 			$pdf->Cell($labelW, 5, $label, 0, 0, 'L');
-			$pdf->SetFont('', '', $default_font_size - 1);
 			$pdf->SetXY($this->marge_gauche + $labelW, $posy);
-			$pdf->MultiCell($valueW, 5, (string) $value, 0, 'L', false, 1);
+			if ((string) $value === '' || $value === null) {
+				$pdf->SetFont('', 'I', $default_font_size - 1);
+				$pdf->SetTextColor(160, 160, 160);
+				$pdf->MultiCell($valueW, 5, 'À COMPLÉTER', 0, 'L', false, 1);
+				$pdf->SetTextColor(0, 0, 0);
+			} else {
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$pdf->MultiCell($valueW, 5, (string) $value, 0, 'L', false, 1);
+			}
 			$posy = $pdf->GetY();
 		};
 
@@ -2036,22 +2043,31 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$this->db->free($resql_billing);
 		}
 
+		// Toujours afficher les champs du contact (À COMPLÉTER si non trouvé)
 		if ($billing_contact) {
-			$drawRow('Nom :', $outputlangs->convToOutputCharset($billing_contact->getFullName($outputlangs)));
-			$drawRow('Adresse :', $outputlangs->convToOutputCharset($billing_contact->address));
-			$drawRow('CP / Ville :', trim($billing_contact->zip.' '.$billing_contact->town));
+			$bc_name    = $outputlangs->convToOutputCharset($billing_contact->getFullName($outputlangs));
+			$bc_address = $outputlangs->convToOutputCharset($billing_contact->address);
+			$bc_cpville = trim($billing_contact->zip.' '.$billing_contact->town);
 			$bc_country = '';
 			if (!empty($billing_contact->country)) {
 				$bc_country = $outputlangs->convToOutputCharset($billing_contact->country);
 			} elseif (!empty($billing_contact->country_code)) {
 				$bc_country = $outputlangs->transnoentitiesnoconv('Country'.$billing_contact->country_code);
 			}
-			$drawRow('Pays :', $bc_country);
-			$drawRow('Téléphone :', $billing_contact->phone_pro ?: $billing_contact->phone_mobile);
-			$drawRow('Fax :', $billing_contact->fax);
-			$drawRow('E-mail :', $billing_contact->email);
-			$posy += 2;
+			$bc_phone = $billing_contact->phone_pro ?: $billing_contact->phone_mobile;
+			$bc_fax   = $billing_contact->fax;
+			$bc_email = $billing_contact->email;
+		} else {
+			$bc_name = $bc_address = $bc_cpville = $bc_country = $bc_phone = $bc_fax = $bc_email = '';
 		}
+		$drawRow('Nom :', $bc_name);
+		$drawRow('Adresse :', $bc_address);
+		$drawRow('CP / Ville :', $bc_cpville);
+		$drawRow('Pays :', $bc_country);
+		$drawRow('Téléphone :', $bc_phone);
+		$drawRow('Fax :', $bc_fax);
+		$drawRow('E-mail :', $bc_email);
+		$posy += 2;
 
 		// Conditions de règlement : depuis le tiers, avec fallback DB puis commande
 		$cond_label = '';
@@ -2107,27 +2123,25 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 		$drawRow('Mode de règlement :', $mode_label);
 
-		// RIB si mode prélèvement (code PRE)
-		if (!empty($thirdparty->mode_reglement_code) && $thirdparty->mode_reglement_code === 'PRE') {
+		// RIB si mode prélèvement : détecté par code PRE ou libellé contenant "prélèvement"
+		$is_prelevement = !empty($thirdparty->mode_reglement_code) && (
+			strtoupper($thirdparty->mode_reglement_code) === 'PRE'
+			|| stripos($mode_label, 'prélèvement') !== false
+			|| stripos($mode_label, 'prelevement') !== false
+		);
+		if ($is_prelevement) {
 			$bac = new CompanyBankAccount($this->db);
+			$rib_iban   = '';
+			$rib_bic    = '';
+			$rib_number = '';
 			if ($bac->fetch(0, $thirdparty->id) > 0) {
-				$rib_lines = array();
-				if (!empty($bac->iban)) {
-					$rib_lines[] = 'IBAN : '.$bac->iban;
-				}
-				if (!empty($bac->bic)) {
-					$rib_lines[] = 'BIC : '.$bac->bic;
-				}
-				if (!empty($bac->number)) {
-					$rib_lines[] = 'N° compte : '.$bac->number;
-				}
-				if ($rib_lines) {
-					$pdf->SetXY($this->marge_gauche, $posy);
-					$pdf->SetFont('', '', $default_font_size - 1);
-					$pdf->MultiCell($pageWidth, 5, implode("\n", $rib_lines), 0, 'L', false, 1);
-					$posy = $pdf->GetY();
-				}
+				$rib_iban   = $bac->iban;
+				$rib_bic    = $bac->bic;
+				$rib_number = $bac->number;
 			}
+			$drawRow('IBAN :', $rib_iban);
+			$drawRow('BIC :', $rib_bic);
+			$drawRow('N° compte :', $rib_number);
 		}
 
 		// Extrafield information_facturation du tiers
