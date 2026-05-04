@@ -2012,19 +2012,24 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$val_w_col = $col_w - $lab_w_col;
 
 		// Ligne label+valeur dans une colonne (Y indépendant par colonne)
-		$drawColRow = function ($label, $value, $col_x, &$col_posy) use (&$pdf, $default_font_size, $lab_w_col, $val_w_col) {
+		// $lw optionnel : largeur du label (défaut $lab_w_col)
+		$drawColRow = function ($label, $value, $col_x, &$col_posy, $lw = null) use (&$pdf, $default_font_size, $lab_w_col, $col_w) {
+			if ($lw === null) {
+				$lw = $lab_w_col;
+			}
+			$vw = $col_w - $lw;
 			$pdf->SetXY($col_x, $col_posy);
 			$pdf->SetFont('', 'B', $default_font_size - 1);
-			$pdf->Cell($lab_w_col, 5, $label, 0, 0, 'L');
-			$pdf->SetXY($col_x + $lab_w_col, $col_posy);
+			$pdf->Cell($lw, 5, $label, 0, 0, 'L');
+			$pdf->SetXY($col_x + $lw, $col_posy);
 			if ((string) $value === '' || $value === null) {
 				$pdf->SetFont('', 'I', $default_font_size - 1);
 				$pdf->SetTextColor(160, 160, 160);
-				$pdf->MultiCell($val_w_col, 5, 'À COMPLÉTER', 0, 'L', false, 1);
+				$pdf->MultiCell($vw, 5, 'À COMPLÉTER', 0, 'L', false, 1);
 				$pdf->SetTextColor(0, 0, 0);
 			} else {
 				$pdf->SetFont('', '', $default_font_size - 1);
-				$pdf->MultiCell($val_w_col, 5, (string) $value, 0, 'L', false, 1);
+				$pdf->MultiCell($vw, 5, (string) $value, 0, 'L', false, 1);
 			}
 			$col_posy = $pdf->GetY();
 		};
@@ -2201,8 +2206,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$drawColRow('E-mail :', $bc_email, $x_left, $posy_l);
 
 		// Colonne droite : conditions, mode, RIB, info facturation
-		$drawColRow('Cond. de règlement :', $cond_label, $x_right, $posy_r);
-		$drawColRow('Mode de règlement :', $mode_label, $x_right, $posy_r);
+		$drawColRow('Cond. de règlement :', $cond_label, $x_right, $posy_r, 42);
+		$drawColRow('Mode de règlement :', $mode_label, $x_right, $posy_r, 42);
 		if ($is_prelevement) {
 			$drawColRow('IBAN :', $rib_iban, $x_right, $posy_r);
 			$drawColRow('BIC :', $rib_bic, $x_right, $posy_r);
