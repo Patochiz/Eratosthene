@@ -1949,7 +1949,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetTextColor(0, 0, 60);
 		$pdf->SetXY($this->marge_gauche, $posy);
 		$pdf->MultiCell($pageWidth, max($logo_height, 8), 'FICHE DE RENSEIGNEMENT CLIENT', 0, 'C', false, 1);
-		$posy = $pdf->GetY() + 6;
+		$posy = $pdf->GetY() + 2;
 
 		$pdf->SetTextColor(0, 0, 0);
 
@@ -2264,7 +2264,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$pdf->Cell($non_w - $box_size - 1, $row_h, 'NON', 0, 1, 'L');
 
 			$pdf->SetDrawColor(128, 128, 128);
-			$posy = $pdf->GetY() + 3;
+			$posy = $pdf->GetY() + 1;
 		}
 
 		// -------------------------------------------------------
