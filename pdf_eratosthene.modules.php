@@ -1924,7 +1924,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pageWidth   = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 		$labelW      = 58;
 		$valueW      = $pageWidth - $labelW;
-		$footer_height = $this->marge_basse + 25; // espace réservé pour le pied de page
+		$footer_height = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22);
 
 		$posy = $this->marge_haute;
 
@@ -1949,7 +1949,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pdf->SetTextColor(0, 0, 60);
 		$pdf->SetXY($this->marge_gauche, $posy);
 		$pdf->MultiCell($pageWidth, max($logo_height, 8), 'FICHE DE RENSEIGNEMENT CLIENT', 0, 'C', false, 1);
-		$posy = $pdf->GetY() + 6;
+		$posy = $pdf->GetY() + 2;
 
 		$pdf->SetTextColor(0, 0, 0);
 
@@ -2003,41 +2003,75 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$posy = $pdf->GetY() + 2;
 		};
 
+		// Paramètres des colonnes (50/50)
+		$col_gap   = 4;
+		$col_w     = ($pageWidth - $col_gap) / 2;
+		$x_left    = $this->marge_gauche;
+		$x_right   = $this->marge_gauche + $col_w + $col_gap;
+		$lab_w_col = 30; // largeur du libellé dans une demi-colonne
+		$val_w_col = $col_w - $lab_w_col;
+
+		// Ligne label+valeur dans une colonne (Y indépendant par colonne)
+		// $lw optionnel : largeur du label (défaut $lab_w_col)
+		$drawColRow = function ($label, $value, $col_x, &$col_posy, $lw = null) use (&$pdf, $default_font_size, $lab_w_col, $col_w) {
+			if ($lw === null) {
+				$lw = $lab_w_col;
+			}
+			$vw = $col_w - $lw;
+			$pdf->SetXY($col_x, $col_posy);
+			$pdf->SetFont('', 'B', $default_font_size - 1);
+			$pdf->Cell($lw, 5, $label, 0, 0, 'L');
+			$pdf->SetXY($col_x + $lw, $col_posy);
+			if ((string) $value === '' || $value === null) {
+				$pdf->SetFont('', 'I', $default_font_size - 1);
+				$pdf->SetTextColor(160, 160, 160);
+				$pdf->MultiCell($vw, 5, 'À COMPLÉTER', 0, 'L', false, 1);
+				$pdf->SetTextColor(0, 0, 0);
+			} else {
+				$pdf->SetFont('', '', $default_font_size - 1);
+				$pdf->MultiCell($vw, 5, (string) $value, 0, 'L', false, 1);
+			}
+			$col_posy = $pdf->GetY();
+		};
+
 		// -------------------------------------------------------
 		// SECTION 1 : INFORMATIONS GÉNÉRALES DE LA SOCIÉTÉ
+		// Colonne gauche : coordonnées | Colonne droite : identifiants légaux
 		// -------------------------------------------------------
-		$drawSection('1. INFORMATIONS GÉNÉRALES DE LA SOCIÉTÉ');
-
-		$drawRow('Raison sociale :', $outputlangs->convToOutputCharset($thirdparty->name));
-		$drawRow('Adresse :', $outputlangs->convToOutputCharset($thirdparty->address));
-		$drawRow('CP / Ville :', trim($thirdparty->zip.' '.$thirdparty->town));
-
 		$country_label = '';
 		if (!empty($thirdparty->country)) {
 			$country_label = $outputlangs->convToOutputCharset($thirdparty->country);
 		} elseif (!empty($thirdparty->country_code)) {
 			$country_label = $outputlangs->transnoentitiesnoconv('Country'.$thirdparty->country_code);
 		}
-		$drawRow('Pays :', $country_label);
-		$drawRow('Téléphone :', $thirdparty->phone);
-		$drawRow('Fax :', $thirdparty->fax);
-		$drawRow('E-mail :', $thirdparty->email);
 
-		$posy += 2;
-		$drawRow('SIREN :', $thirdparty->idprof1);
-		$drawRow('SIRET :', $thirdparty->idprof2);
-		$drawRow('NAF-APE :', $thirdparty->idprof3);
-		$drawRow('N° DE TVA :', $thirdparty->tva_intra);
+		$checkPageBreak(48);
+		$drawSection('1. INFORMATIONS GÉNÉRALES DE LA SOCIÉTÉ');
+		$posy_l = $posy;
+		$posy_r = $posy;
+
+		$drawColRow('Raison sociale :', $outputlangs->convToOutputCharset($thirdparty->name), $x_left, $posy_l);
+		$drawColRow('Adresse :', $outputlangs->convToOutputCharset($thirdparty->address), $x_left, $posy_l);
+		$drawColRow('CP / Ville :', trim($thirdparty->zip.' '.$thirdparty->town), $x_left, $posy_l);
+		$drawColRow('Pays :', $country_label, $x_left, $posy_l);
+		$drawColRow('Téléphone :', $thirdparty->phone, $x_left, $posy_l);
+		$drawColRow('Fax :', $thirdparty->fax, $x_left, $posy_l);
+		$drawColRow('E-mail :', $thirdparty->email, $x_left, $posy_l);
+
+		$drawColRow('SIREN :', $thirdparty->idprof1, $x_right, $posy_r);
+		$drawColRow('SIRET :', $thirdparty->idprof2, $x_right, $posy_r);
+		$drawColRow('NAF-APE :', $thirdparty->idprof3, $x_right, $posy_r);
+		$drawColRow('N° DE TVA :', $thirdparty->tva_intra, $x_right, $posy_r);
+
+		$posy = max($posy_l, $posy_r);
 
 		// -------------------------------------------------------
 		// SECTION 2 : INFORMATIONS DE FACTURATION
+		// Calcul de toutes les valeurs AVANT le rendu (deux colonnes indépendantes)
 		// -------------------------------------------------------
-		$drawSection('2. INFORMATIONS DE FACTURATION');
 
-		// Contact de facturation : contact de ce tiers ayant le rôle BILLING (tous éléments confondus)
-		// Correspond au statut "Facture - Contact client Facturation" visible sur la fiche tiers
+		// Contact de facturation (rôle BILLING sur le tiers)
 		$billing_contact = null;
-
 		$sql_billing = "SELECT DISTINCT ec.fk_socpeople"
 			." FROM ".MAIN_DB_PREFIX."element_contact ec"
 			." JOIN ".MAIN_DB_PREFIX."c_type_contact ctc ON ctc.rowid = ec.fk_c_type_contact"
@@ -2059,7 +2093,6 @@ class pdf_eratosthene extends ModelePDFCommandes
 			$this->db->free($resql_billing);
 		}
 
-		// Toujours afficher les champs du contact (À COMPLÉTER si non trouvé)
 		if ($billing_contact) {
 			$bc_name    = $outputlangs->convToOutputCharset($billing_contact->getFullName($outputlangs));
 			$bc_address = $outputlangs->convToOutputCharset($billing_contact->address);
@@ -2076,16 +2109,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 		} else {
 			$bc_name = $bc_address = $bc_cpville = $bc_country = $bc_phone = $bc_fax = $bc_email = '';
 		}
-		$drawRow('Nom :', $bc_name);
-		$drawRow('Adresse :', $bc_address);
-		$drawRow('CP / Ville :', $bc_cpville);
-		$drawRow('Pays :', $bc_country);
-		$drawRow('Téléphone :', $bc_phone);
-		$drawRow('Fax :', $bc_fax);
-		$drawRow('E-mail :', $bc_email);
-		$posy += 2;
 
-		// Conditions de règlement : depuis le tiers, avec fallback DB puis commande
+		// Conditions de règlement
 		$cond_label = '';
 		if (!empty($thirdparty->cond_reglement_code)) {
 			$trans = $outputlangs->transnoentities('PaymentCondition'.$thirdparty->cond_reglement_code);
@@ -2093,7 +2118,6 @@ class pdf_eratosthene extends ModelePDFCommandes
 				? $trans
 				: $outputlangs->convToOutputCharset(!empty($thirdparty->cond_reglement_doc) ? $thirdparty->cond_reglement_doc : (isset($thirdparty->cond_reglement) ? $thirdparty->cond_reglement : ''));
 		} elseif (!empty($thirdparty->cond_reglement_id)) {
-			// Fallback : lecture directe en DB
 			$sql_cond = "SELECT code, libelle FROM ".MAIN_DB_PREFIX."c_payment_term WHERE rowid = ".((int) $thirdparty->cond_reglement_id);
 			$res_cond = $this->db->query($sql_cond);
 			if ($res_cond && ($obj_cond = $this->db->fetch_object($res_cond))) {
@@ -2101,16 +2125,14 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$cond_label = ($trans !== 'PaymentCondition'.$obj_cond->code) ? $trans : $outputlangs->convToOutputCharset($obj_cond->libelle);
 			}
 		}
-		// Fallback final : conditions de la commande
 		if (empty($cond_label) && !empty($object->cond_reglement_code)) {
 			$trans = $outputlangs->transnoentities('PaymentCondition'.$object->cond_reglement_code);
 			$cond_label = ($trans !== 'PaymentCondition'.$object->cond_reglement_code)
 				? $trans
 				: $outputlangs->convToOutputCharset(!empty($object->cond_reglement_doc) ? $object->cond_reglement_doc : $object->cond_reglement_label);
 		}
-		$drawRow('Conditions de règlement :', $cond_label);
 
-		// Mode de règlement : depuis le tiers, avec fallback DB puis commande
+		// Mode de règlement
 		$mode_label = '';
 		if (!empty($thirdparty->mode_reglement_code)) {
 			$trans = $outputlangs->transnoentities('PaymentType'.$thirdparty->mode_reglement_code);
@@ -2118,16 +2140,14 @@ class pdf_eratosthene extends ModelePDFCommandes
 				? $trans
 				: $outputlangs->convToOutputCharset(isset($thirdparty->mode_reglement) ? $thirdparty->mode_reglement : '');
 		} elseif (!empty($thirdparty->mode_reglement_id)) {
-			// Fallback : lecture directe en DB
 			$sql_mode = "SELECT code, libelle FROM ".MAIN_DB_PREFIX."c_paiement WHERE id = ".((int) $thirdparty->mode_reglement_id);
 			$res_mode = $this->db->query($sql_mode);
 			if ($res_mode && ($obj_mode = $this->db->fetch_object($res_mode))) {
 				$trans = $outputlangs->transnoentities('PaymentType'.$obj_mode->code);
 				$mode_label = ($trans !== 'PaymentType'.$obj_mode->code) ? $trans : $outputlangs->convToOutputCharset($obj_mode->libelle);
-				$thirdparty->mode_reglement_code = $obj_mode->code; // mémoriser pour le test RIB
+				$thirdparty->mode_reglement_code = $obj_mode->code;
 			}
 		}
-		// Fallback final : mode de la commande
 		if (empty($mode_label) && !empty($object->mode_reglement_code)) {
 			$trans = $outputlangs->transnoentities('PaymentType'.$object->mode_reglement_code);
 			$mode_label = ($trans !== 'PaymentType'.$object->mode_reglement_code)
@@ -2137,24 +2157,19 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$thirdparty->mode_reglement_code = $object->mode_reglement_code;
 			}
 		}
-		$drawRow('Mode de règlement :', $mode_label);
 
-		// RIB si mode prélèvement : détecté par code PRE ou libellé contenant "prélèvement"
+		// RIB (si prélèvement)
 		$is_prelevement = !empty($thirdparty->mode_reglement_code) && (
 			strtoupper($thirdparty->mode_reglement_code) === 'PRE'
 			|| stripos($mode_label, 'prélèvement') !== false
 			|| stripos($mode_label, 'prelevement') !== false
 		);
+		$rib_iban = $rib_bic = $rib_number = '';
 		if ($is_prelevement) {
-			// Requête directe sur llx_societe_rib pour éviter les aléas du paramétrage CompanyBankAccount::fetch()
-			$rib_iban   = '';
-			$rib_bic    = '';
-			$rib_number = '';
 			$sql_rib = "SELECT iban_prefix, bic, number"
 				." FROM ".MAIN_DB_PREFIX."societe_rib"
 				." WHERE fk_soc = ".((int) $thirdparty->id)
-				." ORDER BY default_rib DESC, rowid ASC"
-				." LIMIT 1";
+				." ORDER BY default_rib DESC, rowid ASC LIMIT 1";
 			$res_rib = $this->db->query($sql_rib);
 			if ($res_rib) {
 				$obj_rib = $this->db->fetch_object($res_rib);
@@ -2165,30 +2180,57 @@ class pdf_eratosthene extends ModelePDFCommandes
 				}
 				$this->db->free($res_rib);
 			}
-			$drawRow('IBAN :', $rib_iban);
-			$drawRow('BIC :', $rib_bic);
-			$drawRow('N° compte :', $rib_number);
 		}
 
-		// Extrafield information_facturation du tiers
+		// Extrafield information_facturation
+		$info_facturation = '';
 		if (!empty($thirdparty->array_options['options_information_facturation'])) {
-			$drawRow('Informations de facturation :', $outputlangs->convToOutputCharset($thirdparty->array_options['options_information_facturation']));
+			$info_facturation = $outputlangs->convToOutputCharset(
+				dol_string_nohtmltag($thirdparty->array_options['options_information_facturation'], 1)
+			);
 		}
+
+		// Rendu section 2 en deux colonnes
+		$checkPageBreak(48);
+		$drawSection('2. INFORMATIONS DE FACTURATION');
+		$posy_l = $posy;
+		$posy_r = $posy;
+
+		// Colonne gauche : contact de facturation
+		$drawColRow('Nom :', $bc_name, $x_left, $posy_l);
+		$drawColRow('Adresse :', $bc_address, $x_left, $posy_l);
+		$drawColRow('CP / Ville :', $bc_cpville, $x_left, $posy_l);
+		$drawColRow('Pays :', $bc_country, $x_left, $posy_l);
+		$drawColRow('Téléphone :', $bc_phone, $x_left, $posy_l);
+		$drawColRow('Fax :', $bc_fax, $x_left, $posy_l);
+		$drawColRow('E-mail :', $bc_email, $x_left, $posy_l);
+
+		// Colonne droite : conditions, mode, RIB, info facturation
+		$drawColRow('Cond. de règlement :', $cond_label, $x_right, $posy_r, 42);
+		$drawColRow('Mode de règlement :', $mode_label, $x_right, $posy_r, 42);
+		if ($is_prelevement) {
+			$drawColRow('IBAN :', $rib_iban, $x_right, $posy_r);
+			$drawColRow('BIC :', $rib_bic, $x_right, $posy_r);
+			$drawColRow('N° compte :', $rib_number, $x_right, $posy_r);
+		}
+		if ($info_facturation !== '') {
+			$drawColRow('Infos facturation :', $info_facturation, $x_right, $posy_r);
+		}
+
+		$posy = max($posy_l, $posy_r);
 
 		// -------------------------------------------------------
 		// SECTION 3 : CONTACTS DE L'ENTREPRISE
+		// Collecte d'abord, rendu en deux colonnes ensuite
 		// -------------------------------------------------------
-		$drawSection('3. CONTACTS DE L\'ENTREPRISE');
-
-		// IDs des contacts livraison à exclure
-		$shipping_ids = $object->getIdContact('external', 'SHIPPING');
+		$shipping_ids  = $object->getIdContact('external', 'SHIPPING');
+		$all_contacts  = array();
 
 		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."socpeople"
 			." WHERE fk_soc = ".((int) $thirdparty->id)
 			." AND entity IN (".getEntity('contact').")"
 			." ORDER BY lastname, firstname";
 		$resql = $this->db->query($sql);
-		$has_contacts = false;
 		if ($resql) {
 			while ($obj = $this->db->fetch_object($resql)) {
 				if (in_array($obj->rowid, $shipping_ids)) {
@@ -2196,34 +2238,101 @@ class pdf_eratosthene extends ModelePDFCommandes
 				}
 				$c = new Contact($this->db);
 				$c->fetch($obj->rowid);
-
-				$contact_line = trim($c->firstname.' '.$c->lastname);
+				$line = trim($c->firstname.' '.$c->lastname);
 				if (!empty($c->email)) {
-					$contact_line .= ' — '.$c->email;
+					$line .= ' — '.$c->email;
 				}
-
-				$checkPageBreak(8);
-				$pdf->SetXY($this->marge_gauche + 2, $posy);
-				$pdf->SetFont('', '', $default_font_size - 1);
-				$pdf->MultiCell($pageWidth - 2, 5, $outputlangs->convToOutputCharset($contact_line), 0, 'L', false, 1);
-				$posy = $pdf->GetY();
-				$has_contacts = true;
+				$all_contacts[] = $outputlangs->convToOutputCharset($line);
 			}
 			$this->db->free($resql);
 		}
-		if (!$has_contacts) {
-			$pdf->SetXY($this->marge_gauche + 2, $posy);
+
+		$nb_contacts = count($all_contacts);
+		$estimated_h = max(1, (int) ceil($nb_contacts / 2)) * 5 + 16;
+		$checkPageBreak($estimated_h);
+		$drawSection('3. CONTACTS DE L\'ENTREPRISE');
+
+		if (empty($all_contacts)) {
+			$pdf->SetXY($x_left, $posy);
 			$pdf->SetFont('', 'I', $default_font_size - 1);
-			$pdf->MultiCell($pageWidth - 2, 5, '—', 0, 'L', false, 1);
+			$pdf->MultiCell($pageWidth, 5, '—', 0, 'L', false, 1);
 			$posy = $pdf->GetY();
+		} else {
+			$half          = (int) ceil($nb_contacts / 2);
+			$left_contacts = array_slice($all_contacts, 0, $half);
+			$right_contacts = array_slice($all_contacts, $half);
+			$posy_l = $posy;
+			$posy_r = $posy;
+
+			$pdf->SetFont('', '', $default_font_size - 1);
+			foreach ($left_contacts as $line) {
+				$pdf->SetXY($x_left, $posy_l);
+				$pdf->MultiCell($col_w, 5, $line, 0, 'L', false, 1);
+				$posy_l = $pdf->GetY();
+			}
+			foreach ($right_contacts as $line) {
+				$pdf->SetXY($x_right, $posy_r);
+				$pdf->MultiCell($col_w, 5, $line, 0, 'L', false, 1);
+				$posy_r = $pdf->GetY();
+			}
+
+			$posy = max($posy_l, $posy_r);
+		}
+
+		// -------------------------------------------------------
+		// SECTION 4 : DIVERS
+		// -------------------------------------------------------
+		$drawSection('4. DIVERS');
+
+		$divers_questions = array(
+			'Souhaitez-vous que nous continuions à vous expédier 1 carton d\'échantillons et 1 maquette avec vos commandes ?',
+			'Seriez-vous intéressé par une formation « Expert plafond métal » en visio (durée 45 min env.) par Patrick Gourvennec ?',
+		);
+
+		$box_size  = 3.5; // taille des cases à cocher (mm)
+		$oui_w     = 14;  // largeur de la zone "□ OUI"
+		$non_w     = 14;  // largeur de la zone "□ NON"
+		$checks_w  = 6 + $oui_w + $non_w; // espacement + OUI + NON
+		$question_w = $pageWidth - $checks_w;
+
+		$pdf->SetFont('', '', $default_font_size - 1);
+		foreach ($divers_questions as $question) {
+			$nb_lines = $pdf->getNumLines($question, $question_w);
+			$row_h    = $nb_lines * 5 + 1;
+
+			$checkPageBreak($row_h + 4);
+
+			// Question (sans saut de ligne final)
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->SetFont('', '', $default_font_size - 1);
+			$pdf->MultiCell($question_w, 5, $question, 0, 'L', false, 0);
+
+			// Cases à cocher centrées verticalement par rapport à la question
+			$box_y = $posy + ($row_h - $box_size) / 2;
+
+			// □ OUI
+			$x_oui = $this->marge_gauche + $question_w + 4;
+			$pdf->SetDrawColor(0, 0, 0);
+			$pdf->Rect($x_oui, $box_y, $box_size, $box_size);
+			$pdf->SetXY($x_oui + $box_size + 1, $posy);
+			$pdf->Cell($oui_w - $box_size - 1, $row_h, 'OUI', 0, 0, 'L');
+
+			// □ NON
+			$x_non = $x_oui + $oui_w + 2;
+			$pdf->Rect($x_non, $box_y, $box_size, $box_size);
+			$pdf->SetXY($x_non + $box_size + 1, $posy);
+			$pdf->Cell($non_w - $box_size - 1, $row_h, 'NON', 0, 1, 'L');
+
+			$pdf->SetDrawColor(128, 128, 128);
+			$posy = $pdf->GetY() + 1;
 		}
 
 		// -------------------------------------------------------
 		// ENCART DE VALIDATION
 		// -------------------------------------------------------
-		// Hauteur totale de l'encart : espacement (8) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
-		$checkPageBreak(56);
-		$posy += 8;
+		// Hauteur totale de l'encart : espacement (5) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
+		$checkPageBreak(53);
+		$posy += 5;
 
 		// Titre de l'encart
 		$pdf->SetFont('', 'B', $default_font_size);
