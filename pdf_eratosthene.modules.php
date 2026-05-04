@@ -2172,7 +2172,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 		// Extrafield information_facturation du tiers
 		if (!empty($thirdparty->array_options['options_information_facturation'])) {
-			$drawRow('Informations de facturation :', $outputlangs->convToOutputCharset($thirdparty->array_options['options_information_facturation']));
+			$info_facturation = dol_string_nohtmltag($thirdparty->array_options['options_information_facturation'], 1);
+			$drawRow('Informations de facturation :', $outputlangs->convToOutputCharset($info_facturation));
 		}
 
 		// -------------------------------------------------------
