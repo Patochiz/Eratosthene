@@ -2220,6 +2220,54 @@ class pdf_eratosthene extends ModelePDFCommandes
 		}
 
 		// -------------------------------------------------------
+		// SECTION 4 : DIVERS
+		// -------------------------------------------------------
+		$drawSection('4. DIVERS');
+
+		$divers_questions = array(
+			'Souhaitez-vous que nous continuions à vous expédier 1 carton d\'échantillons et 1 maquette avec vos commandes ?',
+			'Seriez-vous intéressé par une formation « Expert plafond métal » en visio (durée 45 min env.) par Patrick Gourvennec ?',
+		);
+
+		$box_size  = 3.5; // taille des cases à cocher (mm)
+		$oui_w     = 14;  // largeur de la zone "□ OUI"
+		$non_w     = 14;  // largeur de la zone "□ NON"
+		$checks_w  = 6 + $oui_w + $non_w; // espacement + OUI + NON
+		$question_w = $pageWidth - $checks_w;
+
+		$pdf->SetFont('', '', $default_font_size - 1);
+		foreach ($divers_questions as $question) {
+			$nb_lines = $pdf->getNumLines($question, $question_w);
+			$row_h    = $nb_lines * 5 + 1;
+
+			$checkPageBreak($row_h + 4);
+
+			// Question (sans saut de ligne final)
+			$pdf->SetXY($this->marge_gauche, $posy);
+			$pdf->SetFont('', '', $default_font_size - 1);
+			$pdf->MultiCell($question_w, 5, $question, 0, 'L', false, 0);
+
+			// Cases à cocher centrées verticalement par rapport à la question
+			$box_y = $posy + ($row_h - $box_size) / 2;
+
+			// □ OUI
+			$x_oui = $this->marge_gauche + $question_w + 4;
+			$pdf->SetDrawColor(0, 0, 0);
+			$pdf->Rect($x_oui, $box_y, $box_size, $box_size);
+			$pdf->SetXY($x_oui + $box_size + 1, $posy);
+			$pdf->Cell($oui_w - $box_size - 1, $row_h, 'OUI', 0, 0, 'L');
+
+			// □ NON
+			$x_non = $x_oui + $oui_w + 2;
+			$pdf->Rect($x_non, $box_y, $box_size, $box_size);
+			$pdf->SetXY($x_non + $box_size + 1, $posy);
+			$pdf->Cell($non_w - $box_size - 1, $row_h, 'NON', 0, 1, 'L');
+
+			$pdf->SetDrawColor(128, 128, 128);
+			$posy = $pdf->GetY() + 3;
+		}
+
+		// -------------------------------------------------------
 		// ENCART DE VALIDATION
 		// -------------------------------------------------------
 		// Hauteur totale de l'encart : espacement (8) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
