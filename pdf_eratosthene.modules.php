@@ -1924,7 +1924,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 		$pageWidth   = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 		$labelW      = 58;
 		$valueW      = $pageWidth - $labelW;
-		$footer_height = $this->marge_basse + 25; // espace réservé pour le pied de page
+		$footer_height = $this->marge_basse + (!getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22);
 
 		$posy = $this->marge_haute;
 
@@ -2270,9 +2270,9 @@ class pdf_eratosthene extends ModelePDFCommandes
 		// -------------------------------------------------------
 		// ENCART DE VALIDATION
 		// -------------------------------------------------------
-		// Hauteur totale de l'encart : espacement (8) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
-		$checkPageBreak(56);
-		$posy += 8;
+		// Hauteur totale de l'encart : espacement (5) + titre (6) + gap (2) + texte (5) + gap (3) + cadre (32)
+		$checkPageBreak(53);
+		$posy += 5;
 
 		// Titre de l'encart
 		$pdf->SetFont('', 'B', $default_font_size);
