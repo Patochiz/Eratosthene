@@ -2238,7 +2238,11 @@ class pdf_eratosthene extends ModelePDFCommandes
 				}
 				$c = new Contact($this->db);
 				$c->fetch($obj->rowid);
-				$line = trim($c->firstname.' '.$c->lastname);
+				$full_name = trim($c->firstname.' '.$c->lastname);
+				if (stripos($full_name, 'Chantier') !== false) {
+					continue;
+				}
+				$line = $full_name;
 				if (!empty($c->email)) {
 					$line .= ' — '.$c->email;
 				}
