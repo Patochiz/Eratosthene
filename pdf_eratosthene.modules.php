@@ -1789,6 +1789,8 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 			// Nom du tiers
 			$carac_client = '';
+			$carac_client_mailto = '';
+			$all_emails = array();
 			if (is_object($thirdparty)) {
 				$carac_client = pdfBuildThirdpartyName($thirdparty, $outputlangs) . "\n";
 
@@ -1806,30 +1808,40 @@ class pdf_eratosthene extends ModelePDFCommandes
 					$carac_client .= "\n" . $outputlangs->transnoentities("Fax") . ": " . $thirdparty->fax;
 				}
 
-				// Email
+				// Email et contacts : regroupés en un seul lien mailto
+				$all_emails = array();
+
 				if (!empty($thirdparty->email)) {
-					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $thirdparty->email;
+					$all_emails[] = trim($thirdparty->email);
 				}
 
-				// Extrafield contacts de la commande - liste d'adresses mail séparées par point-virgule
 				if (!empty($object->array_options['options_contacts'])) {
 					$contacts = $object->array_options['options_contacts'];
-
-					// Si c'est un tableau, le convertir en chaîne avec point-virgule
 					if (is_array($contacts)) {
-						$contacts = implode('; ', $contacts);
+						foreach ($contacts as $c) {
+							$c = trim($c);
+							if (!empty($c)) {
+								$all_emails[] = $c;
+							}
+						}
+					} elseif (is_string($contacts)) {
+						$parts = preg_split('/[;,]\s*/', $contacts);
+						foreach ($parts as $c) {
+							$c = trim($c);
+							if (!empty($c)) {
+								$all_emails[] = $c;
+							}
+						}
 					}
-					// Si c'est une chaîne avec des virgules, remplacer par des points-virgules
-					elseif (is_string($contacts)) {
-						// Remplacer les virgules par des points-virgules si nécessaire
-						$contacts = str_replace(',', '; ', $contacts);
-						// Nettoyer les espaces multiples
-						$contacts = preg_replace('/\s*;\s*/', '; ', $contacts);
-					}
+				}
 
-					if (!empty($contacts)) {
-						$carac_client .= "\n" . "Contact : " . $contacts;
-					}
+				$all_emails = array_unique($all_emails);
+
+				if (!empty($all_emails)) {
+					$mailto_link = 'mailto:' . implode(';', $all_emails);
+					$display_text = implode('; ', $all_emails);
+					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $display_text;
+					$carac_client_mailto = $mailto_link;
 				}
 			}
 
@@ -1864,7 +1876,20 @@ class pdf_eratosthene extends ModelePDFCommandes
 			// Show recipient information
 			$pdf->SetXY($posx + 2, $posy + 3);
 			$pdf->SetFont('', '', $default_font_size - 1);
-			$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
+			if (!empty($carac_client_mailto)) {
+				$email_label = $outputlangs->transnoentities("Email");
+				$email_line_prefix = "\n" . $email_label . ": ";
+				$pos_email = strrpos($carac_client, $email_line_prefix);
+				$carac_client_before_email = substr($carac_client, 0, $pos_email);
+				$pdf->MultiCell($widthrecbox, 4, $carac_client_before_email, 0, $ltrdirection);
+				$curY = $pdf->GetY();
+				$pdf->SetXY($posx + 2, $curY);
+				$display_emails = implode('; ', $all_emails);
+				$html_email = $email_label . ' : <a href="' . $carac_client_mailto . '">' . htmlspecialchars($display_emails) . '</a>';
+				$pdf->writeHTMLCell($widthrecbox - 4, 4, $posx + 2, $curY, $html_email, 0, 1);
+			} else {
+				$pdf->MultiCell($widthrecbox, 4, $carac_client, 0, $ltrdirection);
+			}
 
 			// Position le curseur après le bloc destinataire (hauteur dynamique)
 			$pdf->SetY($posy + $hautcadre_client + 2);
