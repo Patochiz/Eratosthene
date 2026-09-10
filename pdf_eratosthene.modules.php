@@ -1838,7 +1838,7 @@ class pdf_eratosthene extends ModelePDFCommandes
 				$all_emails = array_unique($all_emails);
 
 				if (!empty($all_emails)) {
-					$mailto_link = 'mailto:' . implode(',', $all_emails);
+					$mailto_link = 'mailto:' . implode(';', $all_emails);
 					$display_text = implode('; ', $all_emails);
 					$carac_client .= "\n" . $outputlangs->transnoentities("Email") . ": " . $display_text;
 					$carac_client_mailto = $mailto_link;
