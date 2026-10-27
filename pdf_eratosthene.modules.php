@@ -681,7 +681,29 @@ class pdf_eratosthene extends ModelePDFCommandes
 							$fullWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
 							// Use dol_htmlentitiesbr to properly handle HTML entities and line breaks
-							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, dol_htmlentitiesbr($object->lines[$i]->desc), 0, 1, true, true, 'L', true);
+							$titleHtml = dol_htmlentitiesbr($object->lines[$i]->desc);
+
+							// Try the title on the current page first. If it does not fit, TCPDF would paint
+							// the grey background down to the bottom of this page and write the text on the next one.
+							// In that case, roll back and print the whole title at the top of the next page.
+							$pdf->startTransaction();
+							$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, $titleHtml, 0, 1, true, true, 'L', true);
+							if ($pdf->getPage() > $pageposbefore) {
+								$pdf->rollbackTransaction(true);
+								$pdf->AddPage('', '', true);
+								if (!empty($tplidx)) {
+									$pdf->useTemplate($tplidx);
+								}
+								$pdf->setPage($pageposbefore + 1);
+								$curY = $tab_top_newpage;
+								$showpricebeforepagebreak = 0; // Other columns of this line also go to the new page
+								$pdf->SetFont('', 'B', $default_font_size);
+								$pdf->SetFillColor(230, 230, 230);
+								$pdf->SetTextColor(0, 0, 60);
+								$pdf->writeHTMLCell($fullWidth, 0, $this->marge_gauche, $curY, $titleHtml, 0, 1, true, true, 'L', true);
+							} else {
+								$pdf->commitTransaction();
+							}
 							$curY = $pdf->GetY();
 							$pdf->SetTextColor(0, 0, 0);
 						} else {
