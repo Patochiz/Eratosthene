@@ -1817,19 +1817,40 @@ class pdf_eratosthene extends ModelePDFCommandes
 
 				if (!empty($object->array_options['options_contacts'])) {
 					$contacts = $object->array_options['options_contacts'];
-					if (is_array($contacts)) {
-						foreach ($contacts as $c) {
-							$c = trim($c);
-							if (!empty($c)) {
-								$all_emails[] = $c;
-							}
+					$parts = is_array($contacts) ? $contacts : preg_split('/[;,]\s*/', (string) $contacts);
+
+					// Le champ stocke des IDs de contacts (socpeople.rowid) : on les convertit en adresses mail
+					$contact_ids = array();
+					foreach ($parts as $c) {
+						$c = trim((string) $c);
+						if ($c === '') {
+							continue;
 						}
-					} elseif (is_string($contacts)) {
-						$parts = preg_split('/[;,]\s*/', $contacts);
-						foreach ($parts as $c) {
-							$c = trim($c);
-							if (!empty($c)) {
-								$all_emails[] = $c;
+						if (ctype_digit($c)) {
+							$contact_ids[] = (int) $c;
+						} elseif (isValidEmail($c)) {
+							$all_emails[] = $c;
+						}
+					}
+
+					if (!empty($contact_ids)) {
+						$sql = "SELECT rowid, email FROM " . MAIN_DB_PREFIX . "socpeople";
+						$sql .= " WHERE rowid IN (" . $this->db->sanitize(implode(',', $contact_ids)) . ")";
+						$resql = $this->db->query($sql);
+						if ($resql) {
+							$emails_by_id = array();
+							while ($obj = $this->db->fetch_object($resql)) {
+								$email = trim((string) $obj->email);
+								if ($email !== '') {
+									$emails_by_id[(int) $obj->rowid] = $email;
+								}
+							}
+							$this->db->free($resql);
+							// Conserver l'ordre de sélection
+							foreach ($contact_ids as $id) {
+								if (isset($emails_by_id[$id])) {
+									$all_emails[] = $emails_by_id[$id];
+								}
 							}
 						}
 					}
